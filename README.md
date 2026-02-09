@@ -13,7 +13,7 @@ cd freshway
 
 ### 2. Install Frontend (Client)
 ```bash
-cd client/my-app
+cd client
 npm install
 ```
 Start development server:

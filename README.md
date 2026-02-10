@@ -2,14 +2,26 @@
 
 
 ---
-
 ## 🚀 Getting Started
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/Muhammad-Sheik-Nauman/freshway.git
+### 1️⃣ Fork the Repository
+
+Click the **Fork** button on the top right of this repository  
+This will create a copy under your own GitHub account.
+
+Example:
+https://github.com/YOUR-USERNAME/freshway
+
+---
+
+### 2️⃣ Clone Your Forked Repository
+
+Replace `YOUR-USERNAME` with your GitHub username:
+
+
+git clone https://github.com/YOUR-USERNAME/freshway.git
 cd freshway
-```
+
 
 ### 2. Install Frontend (Client)
 ```bash

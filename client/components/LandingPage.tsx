@@ -3,7 +3,7 @@ import Navbar from "./Navbar";
 
 const LandingPage = () => {
   return (
-    <div className="relative min-h-screen w-screen flex flex-col items-center justify-start font-sans" style={{backgroundImage: "url('/bg.png')", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat"}}>
+    <div className="relative min-h-screen w-screen flex flex-col items-center justify-start font-sans" style={{ backgroundImage: "url('/bg.png')", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}>
       {/* Overlay for white tint (brighter) */}
       <div className="absolute top-0 left-0 w-full h-full bg-white/75 z-0" />
       {/* Navigation Bar */}

@@ -1,5 +1,5 @@
 flask
-streamlit
-tensorflow  # or torch, depending on your choice
+flask-cors
+tensorflow
 numpy
 pillow

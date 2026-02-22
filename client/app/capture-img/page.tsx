@@ -3,10 +3,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 
+interface PredictionResult {
+  freshness: string;
+  confidence: number;
+  status: string;
+  message: string;
+  market_route?: string;
+  all_scores?: Record<string, number>;
+}
+
 export default function CapturePage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<PredictionResult | null>(null);
+  const [showResult, setShowResult] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -31,14 +44,14 @@ export default function CapturePage() {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // 10MB limit in bytes
       const MAX_SIZE = 10 * 1024 * 1024;
       if (file.size > MAX_SIZE) {
         alert("File is too large! Please select an image smaller than 10MB.");
-        event.target.value = ""; // Clear the input
+        event.target.value = "";
         return;
       }
 
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedImage(reader.result as string);
@@ -75,6 +88,14 @@ export default function CapturePage() {
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+        // Convert canvas to blob for API upload
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], "captured_fish_eye.png", { type: "image/png" });
+            setImageFile(file);
+          }
+        }, "image/png");
+
         const imageData = canvas.toDataURL("image/png");
         setSelectedImage(imageData);
         stopCamera();
@@ -92,7 +113,60 @@ export default function CapturePage() {
 
   const resetImage = () => {
     setSelectedImage(null);
+    setImageFile(null);
+    setResult(null);
+    setShowResult(false);
     stopCamera();
+  };
+
+  const analyzeFreshness = async () => {
+    if (!imageFile && !selectedImage) return;
+
+    setIsAnalyzing(true);
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+
+      if (imageFile) {
+        formData.append("image", imageFile);
+      } else if (selectedImage) {
+        // Convert base64 to blob
+        const res = await fetch(selectedImage);
+        const blob = await res.blob();
+        formData.append("image", blob, "fish_eye.png");
+      }
+
+      const response = await fetch("http://localhost:5000/predict", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data: PredictionResult = await response.json();
+      setResult(data);
+      setShowResult(true);
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      setResult({
+        freshness: "Error",
+        confidence: 0,
+        status: "error",
+        message: "Could not connect to the analysis server. Make sure the backend is running.",
+      });
+      setShowResult(true);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getFreshnessColor = (freshness: string) => {
+    switch (freshness) {
+      case "Highly Fresh": return { bg: "from-emerald-500 to-green-400", text: "text-emerald-700", icon: "🟢" };
+      case "Fresh": return { bg: "from-blue-500 to-cyan-400", text: "text-blue-700", icon: "🔵" };
+      case "Not Fresh": return { bg: "from-red-500 to-orange-400", text: "text-red-700", icon: "🔴" };
+      case "Uncertain": return { bg: "from-yellow-500 to-amber-400", text: "text-yellow-700", icon: "🟡" };
+      default: return { bg: "from-gray-500 to-gray-400", text: "text-gray-700", icon: "⚪" };
+    }
   };
 
   return (
@@ -179,9 +253,28 @@ export default function CapturePage() {
               </div>
 
               <div className="flex flex-col gap-4">
-                <button className="w-full py-4 bg-[#3a7bd5] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#255bb5] transition-all flex items-center justify-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-                  Analyze Freshness
+                <button
+                  onClick={analyzeFreshness}
+                  disabled={isAnalyzing}
+                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${isAnalyzing
+                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                      : "bg-[#3a7bd5] text-white hover:bg-[#255bb5]"
+                    }`}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                      Analyze Freshness
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={resetImage}
@@ -218,6 +311,81 @@ export default function CapturePage() {
           </div>
         </div>
       </div>
+
+      {/* ── RESULT MODAL ───────────────────────────────────────────── */}
+      {showResult && result && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowResult(false)}>
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={`bg-gradient-to-r ${getFreshnessColor(result.freshness || "").bg} p-6 text-white text-center`}>
+              <span className="text-5xl block mb-2">{getFreshnessColor(result.freshness || "").icon}</span>
+              <h2 className="text-2xl font-bold">{result.freshness}</h2>
+              {result.confidence > 0 && (
+                <p className="text-white/90 text-lg mt-1">{result.confidence}% Confidence</p>
+              )}
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <p className="text-[#3a4a5a] text-center">{result.message}</p>
+
+              {/* Confidence Bars */}
+              {result.all_scores && (
+                <div className="space-y-3 bg-gray-50 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-[#1a2a3a] uppercase tracking-wider">Detailed Scores</h3>
+                  {Object.entries(result.all_scores).map(([label, score]) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-[#3a4a5a]">{label}</span>
+                        <span className="font-bold text-[#1a2a3a]">{score}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className={`h-2.5 rounded-full bg-gradient-to-r ${getFreshnessColor(label).bg}`}
+                          style={{ width: `${score}%`, transition: "width 1s ease-out" }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Market Route */}
+              {result.market_route && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                  <p className="text-xs uppercase tracking-wider text-blue-500 font-semibold mb-1">Recommended Market</p>
+                  <p className="text-[#1a2a3a] font-bold">{result.market_route}</p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowResult(false)}
+                className="w-full py-3 bg-[#1a2a3a] text-white rounded-xl font-bold hover:bg-[#0d1b2a] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animation keyframes */}
+      <style jsx>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
     </main>
   );
 }

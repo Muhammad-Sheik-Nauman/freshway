@@ -3,10 +3,21 @@
 import React, { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 
+interface PredictionResult {
+  freshness?: string;
+  confidence?: number;
+  status?: string;
+  message?: string;
+  error?: string;
+}
+
 export default function CapturePage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<PredictionResult | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,6 +50,7 @@ export default function CapturePage() {
         return;
       }
 
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedImage(reader.result as string);
@@ -77,6 +89,15 @@ export default function CapturePage() {
 
         const imageData = canvas.toDataURL("image/png");
         setSelectedImage(imageData);
+
+        // Convert canvas to File for upload
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], "captured-photo.png", { type: "image/png" });
+            setImageFile(file);
+          }
+        }, "image/png");
+
         stopCamera();
       }
     }
@@ -92,7 +113,72 @@ export default function CapturePage() {
 
   const resetImage = () => {
     setSelectedImage(null);
+    setImageFile(null);
+    setResult(null);
     stopCamera();
+  };
+
+  const analyzeFreshness = async () => {
+    if (!imageFile) {
+      alert("No image selected.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", imageFile);
+
+      const response = await fetch("/api/predict", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data: PredictionResult = await response.json();
+
+      if (!response.ok) {
+        setResult({ error: data.error || "Something went wrong. Please try again." });
+      } else {
+        setResult(data);
+      }
+    } catch (err) {
+      console.error("Analysis error:", err);
+      setResult({ error: "Could not connect to the analysis server. Make sure the backend is running." });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getFreshnessColor = (freshness?: string) => {
+    if (!freshness) return "text-gray-500";
+    const lower = freshness.toLowerCase();
+    if (lower.includes("highly fresh")) return "text-emerald-500";
+    if (lower.includes("fresh")) return "text-green-500";
+    if (lower.includes("not fresh")) return "text-red-500";
+    if (lower.includes("uncertain")) return "text-amber-500";
+    return "text-blue-500";
+  };
+
+  const getFreshnessBg = (freshness?: string) => {
+    if (!freshness) return "bg-gray-50 border-gray-200";
+    const lower = freshness.toLowerCase();
+    if (lower.includes("highly fresh")) return "bg-emerald-50 border-emerald-200";
+    if (lower.includes("fresh")) return "bg-green-50 border-green-200";
+    if (lower.includes("not fresh")) return "bg-red-50 border-red-200";
+    if (lower.includes("uncertain")) return "bg-amber-50 border-amber-200";
+    return "bg-blue-50 border-blue-200";
+  };
+
+  const getFreshnessEmoji = (freshness?: string) => {
+    if (!freshness) return "🔍";
+    const lower = freshness.toLowerCase();
+    if (lower.includes("highly fresh")) return "🌟";
+    if (lower.includes("fresh")) return "✅";
+    if (lower.includes("not fresh")) return "❌";
+    if (lower.includes("uncertain")) return "⚠️";
+    return "🔍";
   };
 
   return (
@@ -178,10 +264,75 @@ export default function CapturePage() {
                 </button>
               </div>
 
+              {/* Analysis Result */}
+              {result && (
+                <div className={`p-5 rounded-xl border-2 ${result.error ? "bg-red-50 border-red-200" : getFreshnessBg(result.freshness)} transition-all animate-in fade-in`}>
+                  {result.error ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">❌</span>
+                      <div>
+                        <p className="font-bold text-red-700">Analysis Failed</p>
+                        <p className="text-sm text-red-600">{result.error}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{getFreshnessEmoji(result.freshness)}</span>
+                        <div>
+                          <p className="text-sm font-medium text-[#3a4a5a]">Freshness Result</p>
+                          <p className={`text-2xl font-bold ${getFreshnessColor(result.freshness)}`}>
+                            {result.freshness}
+                          </p>
+                        </div>
+                      </div>
+                      {result.confidence !== undefined && (
+                        <div className="mt-3">
+                          <div className="flex justify-between text-sm text-[#3a4a5a] mb-1">
+                            <span>Confidence</span>
+                            <span className="font-bold">{(result.confidence * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] transition-all duration-700"
+                              style={{ width: `${result.confidence * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {result.message && (
+                        <p className="text-sm text-[#3a4a5a] mt-2 italic">
+                          {result.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col gap-4">
-                <button className="w-full py-4 bg-[#3a7bd5] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#255bb5] transition-all flex items-center justify-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
-                  Analyze Freshness
+                <button
+                  onClick={analyzeFreshness}
+                  disabled={isAnalyzing}
+                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all ${isAnalyzing
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-[#3a7bd5] text-white hover:bg-[#255bb5] cursor-pointer"
+                    }`}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                      Analyze Freshness
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={resetImage}

@@ -5,10 +5,11 @@ Architecture: MobileNetV2 (pretrained on ImageNet) with custom classification he
 Classes: Highly Fresh, Fresh, Not Fresh
 Input: 224x224 RGB images of fish eyes
 
-Features:
-- Resume from checkpoint (automatically picks up where you left off)
-- Saves checkpoint after every epoch
-- Two-phase training (frozen base → fine-tuning)
+Optimizations:
+- Proper MobileNetV2 preprocessing ([-1, 1] range, NOT [0, 1])
+- Class weights to handle imbalanced dataset
+- Checkpoint/resume support
+- Two-phase training with gradual unfreezing
 
 Usage:
     python training/train_freshness_classifier.py
@@ -17,8 +18,10 @@ Usage:
 import os
 import sys
 import json
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout, BatchNormalization
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
@@ -26,7 +29,6 @@ from tensorflow.keras.callbacks import (
     EarlyStopping,
     ReduceLROnPlateau,
     ModelCheckpoint,
-    TensorBoard,
     Callback,
 )
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -35,9 +37,9 @@ from datetime import datetime
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
-PHASE1_EPOCHS = 15
-PHASE2_EPOCHS = 50  # Will early-stop much sooner
-LEARNING_RATE = 1e-4
+PHASE1_EPOCHS = 20
+PHASE2_EPOCHS = 40
+LEARNING_RATE = 5e-4
 NUM_CLASSES = 3
 CLASS_NAMES = ["fresh", "highly_fresh", "not_fresh"]
 
@@ -46,7 +48,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRAIN_DIR = os.path.join(BASE_DIR, "data", "train")
 VAL_DIR = os.path.join(BASE_DIR, "data", "val")
 MODEL_SAVE_DIR = os.path.join(BASE_DIR, "models")
-LOG_DIR = os.path.join(BASE_DIR, "logs", "fit")
 
 # Checkpoint paths
 CHECKPOINT_PATH = os.path.join(MODEL_SAVE_DIR, "freshness_checkpoint.keras")
@@ -57,7 +58,7 @@ FINAL_MODEL_PATH = os.path.join(MODEL_SAVE_DIR, "freshness_model_final.keras")
 
 # ─── CUSTOM CALLBACK: Save progress after each epoch ────────────────────────
 class SaveProgressCallback(Callback):
-    """Saves training progress (epoch, phase, metrics) after each epoch."""
+    """Saves training progress after each epoch for resume support."""
 
     def __init__(self, phase, start_epoch=0):
         super().__init__()
@@ -69,24 +70,18 @@ class SaveProgressCallback(Callback):
         progress = {
             "phase": self.phase,
             "epoch": actual_epoch,
-            "total_phase1_epochs": PHASE1_EPOCHS,
-            "total_phase2_epochs": PHASE2_EPOCHS,
             "accuracy": float(logs.get("accuracy", 0)),
             "val_accuracy": float(logs.get("val_accuracy", 0)),
             "loss": float(logs.get("loss", 0)),
             "val_loss": float(logs.get("val_loss", 0)),
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-
-        # Save progress JSON
         with open(PROGRESS_PATH, "w") as f:
             json.dump(progress, f, indent=2)
 
-        # Save checkpoint model (every epoch)
         self.model.save(CHECKPOINT_PATH)
-
         print(f"\n💾 Checkpoint saved! Phase {self.phase}, Epoch {actual_epoch}")
-        print(f"   Accuracy: {logs.get('accuracy', 0):.4f} | Val Accuracy: {logs.get('val_accuracy', 0):.4f}")
+        print(f"   Train Acc: {logs.get('accuracy', 0):.4f} | Val Acc: {logs.get('val_accuracy', 0):.4f}")
         print(f"   You can safely stop and resume later.\n")
 
 
@@ -98,9 +93,39 @@ def load_progress():
     return None
 
 
+def compute_class_weights(train_dir):
+    """
+    Compute class weights to handle imbalanced dataset.
+    Classes with fewer samples get higher weights.
+    """
+    class_counts = {}
+    for class_name in CLASS_NAMES:
+        class_path = os.path.join(train_dir, class_name)
+        if os.path.exists(class_path):
+            count = len([f for f in os.listdir(class_path) if os.path.isfile(os.path.join(class_path, f))])
+            class_counts[class_name] = count
+
+    total = sum(class_counts.values())
+    n_classes = len(class_counts)
+
+    # Sklearn-style balanced class weights: total / (n_classes * count)
+    class_weights = {}
+    for i, class_name in enumerate(CLASS_NAMES):
+        class_weights[i] = total / (n_classes * class_counts[class_name])
+
+    print(f"\n⚖️  Class Weights (handling imbalance):")
+    for i, class_name in enumerate(CLASS_NAMES):
+        print(f"   {class_name}: {class_counts[class_name]} images → weight {class_weights[i]:.3f}")
+    print()
+
+    return class_weights
+
+
 def build_model():
     """
-    Build MobileNetV2 with a custom classification head.
+    Build MobileNetV2 with custom classification head.
+
+    Key: Using MobileNetV2's native preprocessing ([-1, 1] range).
     """
     base_model = MobileNetV2(
         weights="imagenet",
@@ -108,26 +133,28 @@ def build_model():
         input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3),
     )
 
-    # Freeze the base model layers for transfer learning
     base_model.trainable = False
 
-    # Custom classification head
+    # Classification head
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
+    x = Dense(512, activation="relu")(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.4)(x)
     x = Dense(256, activation="relu")(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.3)(x)
     x = Dense(128, activation="relu")(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.3)(x)
+    x = Dropout(0.2)(x)
     output = Dense(NUM_CLASSES, activation="softmax")(x)
 
     model = Model(inputs=base_model.input, outputs=output)
 
-    print(f"\n{'='*60}")
-    print(f"  MobileNetV2 Fish Freshness Classifier")
-    print(f"  Total parameters: {model.count_params():,}")
     trainable = sum(tf.keras.backend.count_params(w) for w in model.trainable_weights)
+    print(f"\n{'='*60}")
+    print(f"  MobileNetV2 Fish Freshness Classifier v2")
+    print(f"  Total parameters: {model.count_params():,}")
     print(f"  Trainable parameters: {trainable:,}")
     print(f"{'='*60}\n")
 
@@ -135,21 +162,29 @@ def build_model():
 
 
 def create_data_generators():
-    """Create training and validation data generators with augmentation."""
+    """
+    Create data generators with PROPER MobileNetV2 preprocessing.
+
+    CRITICAL FIX: Using preprocess_input (scales to [-1, 1])
+    instead of rescale=1/255 (scales to [0, 1]).
+    MobileNetV2 was trained with [-1, 1] normalization!
+    """
     train_datagen = ImageDataGenerator(
-        rescale=1.0 / 255,
-        rotation_range=30,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.15,
-        zoom_range=0.2,
+        preprocessing_function=preprocess_input,  # ← CORRECT for MobileNetV2!
+        rotation_range=40,
+        width_shift_range=0.25,
+        height_shift_range=0.25,
+        shear_range=0.2,
+        zoom_range=0.3,
         horizontal_flip=True,
-        vertical_flip=False,
-        brightness_range=[0.8, 1.2],
+        vertical_flip=True,
+        brightness_range=[0.7, 1.3],
         fill_mode="nearest",
     )
 
-    val_datagen = ImageDataGenerator(rescale=1.0 / 255)
+    val_datagen = ImageDataGenerator(
+        preprocessing_function=preprocess_input,  # ← Same preprocessing for validation
+    )
 
     train_generator = train_datagen.flow_from_directory(
         TRAIN_DIR,
@@ -180,13 +215,10 @@ def get_callbacks(phase, start_epoch=0):
     """Configure training callbacks."""
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
 
-    log_dir = os.path.join(LOG_DIR, datetime.now().strftime("%Y%m%d-%H%M%S"))
-    os.makedirs(log_dir, exist_ok=True)
-
     callbacks = [
         EarlyStopping(
             monitor="val_accuracy",
-            patience=8,
+            patience=10,
             restore_best_weights=True,
             verbose=1,
         ),
@@ -203,16 +235,16 @@ def get_callbacks(phase, start_epoch=0):
             save_best_only=True,
             verbose=1,
         ),
-        TensorBoard(log_dir=log_dir, histogram_freq=1),
         SaveProgressCallback(phase=phase, start_epoch=start_epoch),
     ]
     return callbacks
 
 
 def unfreeze_for_finetuning(model, base_model):
-    """Unfreeze the last 30 layers of MobileNetV2 for fine-tuning."""
+    """Unfreeze the last 50 layers of MobileNetV2 for fine-tuning."""
     base_model.trainable = True
-    for layer in base_model.layers[:-30]:
+    # Freeze all except last 50 layers
+    for layer in base_model.layers[:-50]:
         layer.trainable = False
 
     model.compile(
@@ -229,34 +261,33 @@ def unfreeze_for_finetuning(model, base_model):
 
 def main():
     print("\n" + "🐟" * 30)
-    print("  FISH FRESHNESS CLASSIFIER — MobileNetV2")
+    print("  FISH FRESHNESS CLASSIFIER v2 — MobileNetV2")
+    print("  Improvements: Proper preprocessing + Class weights")
     print("🐟" * 30 + "\n")
 
-    # Verify data directories exist
     if not os.path.exists(TRAIN_DIR):
         print(f"ERROR: Training directory not found: {TRAIN_DIR}")
         sys.exit(1)
 
-    # Check for existing progress
-    progress = load_progress()
+    # Compute class weights for imbalanced data
+    class_weights = compute_class_weights(TRAIN_DIR)
 
     # Create data generators
     print("📂 Loading dataset...")
     train_gen, val_gen = create_data_generators()
 
+    # Check for existing progress
+    progress = load_progress()
+
     # ── RESUME FROM CHECKPOINT ──────────────────────────────────────────
     if progress and os.path.exists(CHECKPOINT_PATH):
         print(f"\n🔄 RESUMING from checkpoint!")
-        print(f"   Phase: {progress['phase']}")
-        print(f"   Epoch: {progress['epoch']}")
-        print(f"   Last accuracy: {progress['accuracy']:.4f}")
+        print(f"   Phase: {progress['phase']}, Epoch: {progress['epoch']}")
         print(f"   Last val_accuracy: {progress['val_accuracy']:.4f}")
         print(f"   Saved at: {progress['timestamp']}")
 
-        # Load the checkpoint model
         model = tf.keras.models.load_model(CHECKPOINT_PATH)
 
-        # Get the base model for potential unfreezing
         base_model = None
         for layer in model.layers:
             if isinstance(layer, tf.keras.Model):
@@ -268,62 +299,52 @@ def main():
             remaining = PHASE1_EPOCHS - completed
 
             if remaining > 0:
-                print(f"\n{'='*60}")
-                print(f"  RESUMING PHASE 1: {remaining} epochs remaining ({completed}/{PHASE1_EPOCHS} done)")
-                print(f"{'='*60}\n")
-
+                print(f"\n  RESUMING PHASE 1: {remaining} epochs remaining")
                 model.compile(
                     optimizer=Adam(learning_rate=LEARNING_RATE),
                     loss="categorical_crossentropy",
                     metrics=["accuracy"],
                 )
-
                 model.fit(
                     train_gen,
                     epochs=remaining,
                     validation_data=val_gen,
+                    class_weight=class_weights,
                     callbacks=get_callbacks(phase=1, start_epoch=completed),
                 )
 
             # Move to Phase 2
             print(f"\n{'='*60}")
-            print(f"  PHASE 2: Fine-tuning last 30 layers of MobileNetV2")
+            print(f"  PHASE 2: Fine-tuning last 50 layers of MobileNetV2")
             print(f"{'='*60}\n")
-
             if base_model:
                 unfreeze_for_finetuning(model, base_model)
-
             model.fit(
                 train_gen,
                 epochs=PHASE2_EPOCHS,
                 validation_data=val_gen,
+                class_weight=class_weights,
                 callbacks=get_callbacks(phase=2, start_epoch=0),
             )
 
         elif progress["phase"] == 2:
             completed = progress["epoch"]
             remaining = PHASE2_EPOCHS - completed
-
             if remaining > 0:
-                print(f"\n{'='*60}")
-                print(f"  RESUMING PHASE 2: {remaining} epochs remaining ({completed}/{PHASE2_EPOCHS} done)")
-                print(f"{'='*60}\n")
-
+                print(f"\n  RESUMING PHASE 2: {remaining} epochs remaining")
                 if base_model:
                     unfreeze_for_finetuning(model, base_model)
-
                 model.fit(
                     train_gen,
                     epochs=remaining,
                     validation_data=val_gen,
+                    class_weight=class_weights,
                     callbacks=get_callbacks(phase=2, start_epoch=completed),
                 )
-            else:
-                print("✅ Training was already complete!")
 
     # ── FRESH START ─────────────────────────────────────────────────────
     else:
-        print("📦 Building fresh MobileNetV2 model...")
+        print("📦 Building fresh MobileNetV2 model (v2 — improved)...")
         model, base_model = build_model()
 
         model.compile(
@@ -332,22 +353,24 @@ def main():
             metrics=["accuracy"],
         )
 
-        # Phase 1: Train classification head
+        # Phase 1
         print(f"\n{'='*60}")
         print(f"  PHASE 1: Training classification head (base frozen)")
-        print(f"  {PHASE1_EPOCHS} epochs")
+        print(f"  {PHASE1_EPOCHS} epochs | LR: {LEARNING_RATE}")
         print(f"{'='*60}\n")
 
         model.fit(
             train_gen,
             epochs=PHASE1_EPOCHS,
             validation_data=val_gen,
+            class_weight=class_weights,
             callbacks=get_callbacks(phase=1, start_epoch=0),
         )
 
-        # Phase 2: Fine-tune
+        # Phase 2
         print(f"\n{'='*60}")
-        print(f"  PHASE 2: Fine-tuning last 30 layers of MobileNetV2")
+        print(f"  PHASE 2: Fine-tuning last 50 layers of MobileNetV2")
+        print(f"  Up to {PHASE2_EPOCHS} epochs | LR: 1e-5")
         print(f"{'='*60}\n")
 
         unfreeze_for_finetuning(model, base_model)
@@ -356,23 +379,21 @@ def main():
             train_gen,
             epochs=PHASE2_EPOCHS,
             validation_data=val_gen,
+            class_weight=class_weights,
             callbacks=get_callbacks(phase=2, start_epoch=0),
         )
 
-    # ── SAVE FINAL MODEL ────────────────────────────────────────────────
+    # ── SAVE & EVALUATE ─────────────────────────────────────────────────
     model.save(FINAL_MODEL_PATH)
     print(f"\n✅ Final model saved to: {FINAL_MODEL_PATH}")
 
-    # Evaluate
     print("\n📊 Final Evaluation on Validation Set:")
     loss, accuracy = model.evaluate(val_gen)
     print(f"   Loss: {loss:.4f}")
     print(f"   Accuracy: {accuracy:.4f} ({accuracy*100:.1f}%)")
 
-    # Clean up checkpoint (training complete)
     if os.path.exists(PROGRESS_PATH):
         os.remove(PROGRESS_PATH)
-        print("\n🧹 Cleaned up checkpoint files (training complete)")
 
     print("\n🎉 Training complete!")
 

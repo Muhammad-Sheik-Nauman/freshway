@@ -3,8 +3,7 @@ server/data/train/
 server/data/val/
 
 # ─── Trained Models (too large for git) ──────────────────
-server/models/*.keras
-server/models/*.h5
+
 
 # ─── Training Logs ───────────────────────────────────────
 server/logs/

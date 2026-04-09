@@ -175,7 +175,7 @@ export default function CapturePage() {
 
       <Navbar />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-2xl">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-2xl mt-[72px]">
         <div className="w-full bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-10 border border-white/20">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-[#1a2a3a] mb-2">Capture Quality</h1>

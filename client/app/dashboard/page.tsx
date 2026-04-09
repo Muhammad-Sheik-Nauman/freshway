@@ -32,8 +32,8 @@ const dashboardItems = [
     ),
     gradient: "from-[#11998e] to-[#38ef7d]",
     shadowColor: "shadow-[#11998e]/30",
-    href: "#",
-    badge: "Coming Soon",
+    href: "/supply-chain",
+    badge: "Live",
   },
 ];
 
@@ -56,7 +56,7 @@ export default function DashboardPage() {
       <Navbar />
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-5xl px-4 sm:px-8 py-12 flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-5xl px-4 sm:px-8 py-12 flex flex-col items-center mt-[72px]">
         {/* Header */}
         <div className="text-center mb-12">
           <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-sm font-semibold px-4 py-1.5 rounded-full mb-4 tracking-wide uppercase">
@@ -130,7 +130,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
-            Supply Chain — Coming Soon
+            Supply Chain — Live
           </div>
         </div>
       </div>

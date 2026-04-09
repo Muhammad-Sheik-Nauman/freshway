@@ -98,6 +98,15 @@ export default function CapturePage() {
 
         const imageData = canvas.toDataURL("image/png");
         setSelectedImage(imageData);
+
+        // Convert canvas to File for upload
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], "captured-photo.png", { type: "image/png" });
+            setImageFile(file);
+          }
+        }, "image/png");
+
         stopCamera();
       }
     }
@@ -251,6 +260,52 @@ export default function CapturePage() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
               </div>
+
+              {/* Analysis Result */}
+              {result && (
+                <div className={`p-5 rounded-xl border-2 ${result.error ? "bg-red-50 border-red-200" : getFreshnessBg(result.freshness)} transition-all animate-in fade-in`}>
+                  {result.error ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">❌</span>
+                      <div>
+                        <p className="font-bold text-red-700">Analysis Failed</p>
+                        <p className="text-sm text-red-600">{result.error}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{getFreshnessEmoji(result.freshness)}</span>
+                        <div>
+                          <p className="text-sm font-medium text-[#3a4a5a]">Freshness Result</p>
+                          <p className={`text-2xl font-bold ${getFreshnessColor(result.freshness)}`}>
+                            {result.freshness}
+                          </p>
+                        </div>
+                      </div>
+                      {result.confidence !== undefined && (
+                        <div className="mt-3">
+                          <div className="flex justify-between text-sm text-[#3a4a5a] mb-1">
+                            <span>Confidence</span>
+                            <span className="font-bold">{(result.confidence * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] transition-all duration-700"
+                              style={{ width: `${result.confidence * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {result.message && (
+                        <p className="text-sm text-[#3a4a5a] mt-2 italic">
+                          {result.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-col gap-4">
                 <button

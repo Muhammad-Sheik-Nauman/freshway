@@ -178,6 +178,26 @@ export default function CapturePage() {
     }
   };
 
+  const getFreshnessBg = (freshness: string) => {
+    switch (freshness) {
+      case "Highly Fresh": return "bg-emerald-50 border-emerald-200";
+      case "Fresh": return "bg-blue-50 border-blue-200";
+      case "Not Fresh": return "bg-red-50 border-red-200";
+      case "Uncertain": return "bg-yellow-50 border-yellow-200";
+      default: return "bg-gray-50 border-gray-200";
+    }
+  };
+
+  const getFreshnessEmoji = (freshness: string) => {
+    switch (freshness) {
+      case "Highly Fresh": return "🟢";
+      case "Fresh": return "🔵";
+      case "Not Fresh": return "🔴";
+      case "Uncertain": return "🟡";
+      default: return "⚪";
+    }
+  };
+
   return (
     <main className="relative min-h-screen w-full flex flex-col items-center justify-start font-sans" style={{ backgroundImage: "url('/bg.png')", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}>
       <div className="absolute top-0 left-0 w-full h-full bg-white/75 z-0" />
@@ -263,13 +283,13 @@ export default function CapturePage() {
 
               {/* Analysis Result */}
               {result && (
-                <div className={`p-5 rounded-xl border-2 ${result.error ? "bg-red-50 border-red-200" : getFreshnessBg(result.freshness)} transition-all animate-in fade-in`}>
-                  {result.error ? (
+                <div className={`p-5 rounded-xl border-2 ${result.status === "error" ? "bg-red-50 border-red-200" : getFreshnessBg(result.freshness)} transition-all animate-in fade-in`}>
+                  {result.status === "error" ? (
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">❌</span>
                       <div>
                         <p className="font-bold text-red-700">Analysis Failed</p>
-                        <p className="text-sm text-red-600">{result.error}</p>
+                        <p className="text-sm text-red-600">{result.message}</p>
                       </div>
                     </div>
                   ) : (

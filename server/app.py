@@ -4,37 +4,47 @@ import os
 from inference.predict import predict
 
 app = Flask(__name__)
-CORS(app) # Enable CORS for all routes
+CORS(app)  # Enable CORS for all routes
+
 
 @app.route("/predict", methods=["POST"])
 def predict_endpoint():
-    # Handle image upload
-    if 'image' not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
-    
-    image = request.files['image']
+    """
+    Predict fish freshness from an uploaded image.
+
+    Expects: multipart/form-data with an 'image' file field.
+    Returns: JSON with freshness label, confidence, market route, etc.
+    """
+    # Validate image upload
+    if "image" not in request.files:
+        return jsonify({"error": "No image uploaded", "status": "error"}), 400
+
+    image = request.files["image"]
+    if image.filename == "":
+        return jsonify({"error": "No file selected", "status": "error"}), 400
+
+    # Save temporarily
     os.makedirs("temp", exist_ok=True)
     image_path = os.path.join("temp", image.filename)
     image.save(image_path)
-    
-    # Run prediction pipeline
+
     try:
+        # Run the MobileNetV2 prediction pipeline
         result = predict(image_path)
-        # Handle case where predict is a stub/dummy
-        if result is None:
-            result = {
-                "freshness": "Fresh",
-                "confidence": 0.95,
-                "status": "success",
-                "message": "Fish eye detected and analyzed."
-            }
+        return jsonify(result)
     except Exception as e:
-        result = {"error": str(e)}
+        return jsonify({"error": str(e), "status": "error"}), 500
     finally:
+        # Clean up temp file
         if os.path.exists(image_path):
             os.remove(image_path)
-            
-    return jsonify(result)
+
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Health check endpoint."""
+    return jsonify({"status": "ok", "message": "FreshWay API is running"})
+
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)

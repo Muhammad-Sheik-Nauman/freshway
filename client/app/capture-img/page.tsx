@@ -4,11 +4,12 @@ import React, { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 
 interface PredictionResult {
-  freshness?: string;
-  confidence?: number;
-  status?: string;
-  message?: string;
-  error?: string;
+  freshness: string;
+  confidence: number;
+  status: string;
+  message: string;
+  market_route?: string;
+  all_scores?: Record<string, number>;
 }
 
 export default function CapturePage() {
@@ -18,6 +19,7 @@ export default function CapturePage() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
+  const [showResult, setShowResult] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -42,11 +44,10 @@ export default function CapturePage() {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // 10MB limit in bytes
       const MAX_SIZE = 10 * 1024 * 1024;
       if (file.size > MAX_SIZE) {
         alert("File is too large! Please select an image smaller than 10MB.");
-        event.target.value = ""; // Clear the input
+        event.target.value = "";
         return;
       }
 
@@ -87,6 +88,14 @@ export default function CapturePage() {
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+        // Convert canvas to blob for API upload
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], "captured_fish_eye.png", { type: "image/png" });
+            setImageFile(file);
+          }
+        }, "image/png");
+
         const imageData = canvas.toDataURL("image/png");
         setSelectedImage(imageData);
 
@@ -115,70 +124,78 @@ export default function CapturePage() {
     setSelectedImage(null);
     setImageFile(null);
     setResult(null);
+    setShowResult(false);
     stopCamera();
   };
 
   const analyzeFreshness = async () => {
-    if (!imageFile) {
-      alert("No image selected.");
-      return;
-    }
+    if (!imageFile && !selectedImage) return;
 
     setIsAnalyzing(true);
     setResult(null);
 
     try {
       const formData = new FormData();
-      formData.append("image", imageFile);
 
-      const response = await fetch("/api/predict", {
+      if (imageFile) {
+        formData.append("image", imageFile);
+      } else if (selectedImage) {
+        // Convert base64 to blob
+        const res = await fetch(selectedImage);
+        const blob = await res.blob();
+        formData.append("image", blob, "fish_eye.png");
+      }
+
+      const response = await fetch("http://localhost:5000/predict", {
         method: "POST",
         body: formData,
       });
 
       const data: PredictionResult = await response.json();
-
-      if (!response.ok) {
-        setResult({ error: data.error || "Something went wrong. Please try again." });
-      } else {
-        setResult(data);
-      }
-    } catch (err) {
-      console.error("Analysis error:", err);
-      setResult({ error: "Could not connect to the analysis server. Make sure the backend is running." });
+      setResult(data);
+      setShowResult(true);
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      setResult({
+        freshness: "Error",
+        confidence: 0,
+        status: "error",
+        message: "Could not connect to the analysis server. Make sure the backend is running.",
+      });
+      setShowResult(true);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const getFreshnessColor = (freshness?: string) => {
-    if (!freshness) return "text-gray-500";
-    const lower = freshness.toLowerCase();
-    if (lower.includes("highly fresh")) return "text-emerald-500";
-    if (lower.includes("fresh")) return "text-green-500";
-    if (lower.includes("not fresh")) return "text-red-500";
-    if (lower.includes("uncertain")) return "text-amber-500";
-    return "text-blue-500";
+  const getFreshnessColor = (freshness: string) => {
+    switch (freshness) {
+      case "Highly Fresh": return { bg: "from-emerald-500 to-green-400", text: "text-emerald-700", icon: "🟢" };
+      case "Fresh": return { bg: "from-blue-500 to-cyan-400", text: "text-blue-700", icon: "🔵" };
+      case "Not Fresh": return { bg: "from-red-500 to-orange-400", text: "text-red-700", icon: "🔴" };
+      case "Uncertain": return { bg: "from-yellow-500 to-amber-400", text: "text-yellow-700", icon: "🟡" };
+      default: return { bg: "from-gray-500 to-gray-400", text: "text-gray-700", icon: "⚪" };
+    }
   };
 
-  const getFreshnessBg = (freshness?: string) => {
-    if (!freshness) return "bg-gray-50 border-gray-200";
-    const lower = freshness.toLowerCase();
-    if (lower.includes("highly fresh")) return "bg-emerald-50 border-emerald-200";
-    if (lower.includes("fresh")) return "bg-green-50 border-green-200";
-    if (lower.includes("not fresh")) return "bg-red-50 border-red-200";
-    if (lower.includes("uncertain")) return "bg-amber-50 border-amber-200";
-    return "bg-blue-50 border-blue-200";
+  const getFreshnessBg = (freshness: string) => {
+    switch (freshness) {
+      case "Highly Fresh": return "bg-emerald-50 border-emerald-200";
+      case "Fresh": return "bg-blue-50 border-blue-200";
+      case "Not Fresh": return "bg-red-50 border-red-200";
+      case "Uncertain": return "bg-yellow-50 border-yellow-200";
+      default: return "bg-gray-50 border-gray-200";
+    }
   };
 
-  const getFreshnessEmoji = (freshness?: string) => {
-    if (!freshness) return "🔍";
-    const lower = freshness.toLowerCase();
-    if (lower.includes("highly fresh")) return "🌟";
-    if (lower.includes("fresh")) return "✅";
-    if (lower.includes("not fresh")) return "❌";
-    if (lower.includes("uncertain")) return "⚠️";
-    return "🔍";
+  const getFreshnessEmoji = (freshness: string) => {
+    switch (freshness) {
+      case "Highly Fresh": return "🟢";
+      case "Fresh": return "🔵";
+      case "Not Fresh": return "🔴";
+      case "Uncertain": return "🟡";
+      default: return "⚪";
+    }
   };
 
   return (
@@ -187,7 +204,7 @@ export default function CapturePage() {
 
       <Navbar />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-2xl">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-2xl mt-[72px]">
         <div className="w-full bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-10 border border-white/20">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-[#1a2a3a] mb-2">Capture Quality</h1>
@@ -266,13 +283,13 @@ export default function CapturePage() {
 
               {/* Analysis Result */}
               {result && (
-                <div className={`p-5 rounded-xl border-2 ${result.error ? "bg-red-50 border-red-200" : getFreshnessBg(result.freshness)} transition-all animate-in fade-in`}>
-                  {result.error ? (
+                <div className={`p-5 rounded-xl border-2 ${result.status === "error" ? "bg-red-50 border-red-200" : getFreshnessBg(result.freshness)} transition-all animate-in fade-in`}>
+                  {result.status === "error" ? (
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">❌</span>
                       <div>
                         <p className="font-bold text-red-700">Analysis Failed</p>
-                        <p className="text-sm text-red-600">{result.error}</p>
+                        <p className="text-sm text-red-600">{result.message}</p>
                       </div>
                     </div>
                   ) : (
@@ -314,14 +331,14 @@ export default function CapturePage() {
                 <button
                   onClick={analyzeFreshness}
                   disabled={isAnalyzing}
-                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all ${isAnalyzing
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-[#3a7bd5] text-white hover:bg-[#255bb5] cursor-pointer"
+                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${isAnalyzing
+                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                      : "bg-[#3a7bd5] text-white hover:bg-[#255bb5]"
                     }`}
                 >
                   {isAnalyzing ? (
                     <>
-                      <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -369,6 +386,81 @@ export default function CapturePage() {
           </div>
         </div>
       </div>
+
+      {/* ── RESULT MODAL ───────────────────────────────────────────── */}
+      {showResult && result && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowResult(false)}>
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={`bg-gradient-to-r ${getFreshnessColor(result.freshness || "").bg} p-6 text-white text-center`}>
+              <span className="text-5xl block mb-2">{getFreshnessColor(result.freshness || "").icon}</span>
+              <h2 className="text-2xl font-bold">{result.freshness}</h2>
+              {result.confidence > 0 && (
+                <p className="text-white/90 text-lg mt-1">{result.confidence}% Confidence</p>
+              )}
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <p className="text-[#3a4a5a] text-center">{result.message}</p>
+
+              {/* Confidence Bars */}
+              {result.all_scores && (
+                <div className="space-y-3 bg-gray-50 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-[#1a2a3a] uppercase tracking-wider">Detailed Scores</h3>
+                  {Object.entries(result.all_scores).map(([label, score]) => (
+                    <div key={label}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-[#3a4a5a]">{label}</span>
+                        <span className="font-bold text-[#1a2a3a]">{score}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className={`h-2.5 rounded-full bg-gradient-to-r ${getFreshnessColor(label).bg}`}
+                          style={{ width: `${score}%`, transition: "width 1s ease-out" }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Market Route */}
+              {result.market_route && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                  <p className="text-xs uppercase tracking-wider text-blue-500 font-semibold mb-1">Recommended Market</p>
+                  <p className="text-[#1a2a3a] font-bold">{result.market_route}</p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowResult(false)}
+                className="w-full py-3 bg-[#1a2a3a] text-white rounded-xl font-bold hover:bg-[#0d1b2a] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animation keyframes */}
+      <style jsx>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
     </main>
   );
 }

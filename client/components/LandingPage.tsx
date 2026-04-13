@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "./Navbar";
 import Link from "next/link";
+import { useSession, signIn } from "next-auth/react";
 
 // ── Animated counter hook ────────────────────────────────
 function useCounter(target: number, duration = 1800) {
@@ -51,6 +52,15 @@ function StatItem({ value, suffix, label }: { value: number; suffix: string; lab
 // ── Main Component ───────────────────────────────────────
 const LandingPage = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+
+  const handleGetStarted = () => {
+    if (session) {
+      router.push("/dashboard");
+    } else {
+      signIn(undefined, { callbackUrl: "/dashboard" });
+    }
+  };
 
   const features = [
     {
@@ -122,7 +132,7 @@ const LandingPage = () => {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-14">
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={handleGetStarted}
               className="group flex items-center justify-center gap-2 bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white font-bold px-8 py-4 rounded-xl shadow-lg hover:shadow-[#3a7bd5]/40 hover:scale-105 transition-all text-base"
             >
               Get Started Free
@@ -305,10 +315,10 @@ const LandingPage = () => {
             Join the future of fish quality control. No subscription, no lab equipment — just your camera and FreshWay.
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={handleGetStarted}
             className="inline-flex items-center gap-3 bg-white text-[#1a2a3a] font-bold px-10 py-4 rounded-xl shadow-xl hover:scale-105 hover:shadow-white/20 transition-all text-lg"
           >
-            Open Dashboard
+            {session ? "Open Dashboard" : "Get Started Now"}
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
             </svg>

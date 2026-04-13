@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
+import { useSession, signOut, signIn } from "next-auth/react";
+
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
@@ -14,6 +16,7 @@ const navLinks = [
 const Navbar = () => {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { data: session } = useSession();
 
   return (
     <nav className="w-full bg-white/90 fixed top-0 left-0 right-0 z-50 shadow-md border-b border-slate-200 backdrop-blur-md">
@@ -40,9 +43,37 @@ const Navbar = () => {
 
         {/* Right side */}
         <div className="flex items-center gap-3">
-          <button className="bg-[#3a7bd5] text-white border-none rounded-md py-2 px-5 md:px-7 font-semibold text-base cursor-pointer shadow-sm hover:bg-[#255bb5] transition ml-4 md:ml-8">
-            Sign In
-          </button>
+          {session ? (
+            <div className="flex items-center gap-3 bg-slate-50/50 hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all rounded-full py-1.5 pl-4 pr-1.5 cursor-default">
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-sm font-bold text-slate-700 leading-tight capitalize max-w-[150px] truncate">
+                  {session.user?.name?.toLowerCase()}
+                </span>
+                <button 
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="text-[10px] font-extrabold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest mt-0.5"
+                >
+                  Sign Out
+                </button>
+              </div>
+              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm ring-2 ring-[#3a7bd5]/20 overflow-hidden shrink-0 bg-slate-100">
+                <img 
+                  src={session.user?.image || `https://ui-avatars.com/api/?name=${session.user?.name}&background=3a7bd5&color=fff&rounded=true`} 
+                  alt={session.user?.name || "User"} 
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          ) : (
+            <button 
+              onClick={() => signIn(undefined, { callbackUrl: "/dashboard" })}
+              className="bg-[#3a7bd5] text-white border-none rounded-md py-2 px-5 md:px-7 font-semibold text-base cursor-pointer shadow-sm hover:bg-[#255bb5] transition ml-4 md:ml-8"
+            >
+              Sign In
+            </button>
+          )}
+
           {/* Mobile hamburger */}
           <button
             className="sm:hidden p-2 rounded-lg hover:bg-slate-100 transition"
@@ -77,6 +108,14 @@ const Navbar = () => {
               {link.label}
             </Link>
           ))}
+          {session && (
+            <button 
+              onClick={() => signOut()}
+              className="font-semibold text-sm py-2 px-3 rounded-lg text-red-500 hover:bg-red-50 text-left"
+            >
+              Logout
+            </button>
+          )}
         </div>
       )}
     </nav>

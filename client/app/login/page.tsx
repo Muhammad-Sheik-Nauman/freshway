@@ -10,7 +10,6 @@ export default function LoginPage() {
     fullName: "",
     email: "",
     password: "",
-    role: "Buyer",
     location: "",
   });
 
@@ -47,11 +46,14 @@ export default function LoginPage() {
           <h2 className="text-2xl font-extrabold text-[#1a2a3a]">
             {isSignUp ? "Create Account" : "Welcome Back"}
           </h2>
+          <p className="text-sm text-[#3a4a5a] mt-1">
+            {isSignUp ? "Join FreshWay as a buyer or seller" : "Sign in to continue"}
+          </p>
         </div>
 
-        {/* Google Btn */}
+        {/* Google Btn — redirects to select-role for new users */}
         <button
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          onClick={() => signIn("google", { callbackUrl: "/select-role" })}
           className="w-full flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all mb-5 group shadow-sm"
         >
           <svg width="18" height="18" viewBox="0 0 24 24">
@@ -81,16 +83,6 @@ export default function LoginPage() {
                 onChange={handleInputChange}
                 className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/20 focus:border-[#3a7bd5] text-sm text-slate-800"
               />
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/20 focus:border-[#3a7bd5] text-sm text-slate-700 bg-white"
-              >
-                <option value="Buyer">Retail Buyer</option>
-                <option value="Seller">Fish Seller / Vendor</option>
-                <option value="Fisherman">Fisherman</option>
-              </select>
               <input
                 type="text"
                 name="location"

@@ -11,8 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { recipientEmail, content, dealId } = await req.json();
-    if (!recipientEmail || !content) {
+    const { recipientEmail, content, imageUrl, dealId } = await req.json();
+    if (!recipientEmail || (!content && !imageUrl)) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
       senderEmail: session.user.email,
       senderName: session.user.name,
       recipientEmail,
-      content,
+      content: content || "",
+      imageUrl: imageUrl || null,
       dealId: dealId || null,
       read: false,
       createdAt: new Date(),
@@ -119,6 +120,51 @@ export async function GET(req: NextRequest) {
     }
   } catch (error) {
     console.error("Error fetching messages:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// Delete a message or an entire conversation
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getServerSession();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const messageId = searchParams.get("messageId");
+    const partnerEmail = searchParams.get("partnerEmail");
+
+    const client = await clientPromise;
+    const db = client.db();
+    const userEmail = session.user.email;
+
+    if (messageId) {
+      // Delete a specific message (only if sender)
+      const result = await db.collection("messages").deleteOne({
+        _id: new ObjectId(messageId),
+        senderEmail: userEmail, // Only sender can delete their message
+      });
+      if (result.deletedCount === 0) {
+        return NextResponse.json({ error: "Message not found or unauthorized to delete" }, { status: 404 });
+      }
+      return NextResponse.json({ success: true });
+    } else if (partnerEmail) {
+      // Delete an entire conversation with partnerEmail
+      // This deletes all messages between these two users
+      const result = await db.collection("messages").deleteMany({
+        $or: [
+          { senderEmail: userEmail, recipientEmail: partnerEmail },
+          { senderEmail: partnerEmail, recipientEmail: userEmail },
+        ],
+      });
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount });
+    } else {
+      return NextResponse.json({ error: "Missing messageId or partnerEmail" }, { status: 400 });
+    }
+  } catch (error) {
+    console.error("Error deleting messages:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

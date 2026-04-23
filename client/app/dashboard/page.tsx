@@ -44,6 +44,17 @@ interface Deal {
   createdAt: string;
 }
 
+interface Review {
+  _id: string;
+  buyerEmail: string;
+  buyerName: string;
+  sellerEmail: string;
+  fishName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 interface FishListing {
   _id: string;
   sellerEmail: string;
@@ -139,6 +150,10 @@ export default function DashboardPage() {
   const [posting, setPosting] = useState(false);
   const [messageImage, setMessageImage] = useState<string | null>(null);
 
+  // Reviews state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [showReviewsViewer, setShowReviewsViewer] = useState<{sellerEmail: string, sellerName: string} | null>(null);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -176,11 +191,13 @@ export default function DashboardPage() {
     fetchConversations();
     fetchDeals();
     fetchMyListings();
+    fetchReviews();
 
     // Real-time polling for conversations every 3s
     convPollingRef.current = setInterval(() => {
       fetchConversations();
       fetchDeals();
+      fetchReviews();
     }, 3000);
 
     return () => {
@@ -212,6 +229,13 @@ export default function DashboardPage() {
       const res = await fetch("/api/fish-listings?mine=true");
       if (res.ok) setMyListings(await res.json());
     } catch (err) { console.error(err); }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const res = await fetch(`/api/reviews?sellerEmail=${session?.user?.email || ""}`);
+      if (res.ok) setReviews(await res.json());
+    } catch (err) { console.error("Error fetching reviews:", err); }
   };
 
   const postFishListing = async () => {
@@ -346,13 +370,29 @@ export default function DashboardPage() {
 
       <div className="relative z-10 w-full max-w-6xl px-4 sm:px-8 py-10 mt-[72px]">
         {/* Header */}
-        <div className="mb-6">
-          <span className="inline-block bg-[#11998e]/10 text-[#11998e] text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wider">
-            Seller Dashboard
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1a2a3a]">
-            Welcome, {session?.user?.name?.split(" ")[0] || "Seller"} 👋
-          </h1>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <span className="inline-block bg-[#11998e]/10 text-[#11998e] text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wider">
+              Seller Dashboard
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#1a2a3a]">
+              Welcome, {session?.user?.name?.split(" ")[0] || "Seller"} 👋
+            </h1>
+          </div>
+          {(() => {
+             const avgRating = reviews.length ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : "New";
+             return (
+               <button onClick={() => setShowReviewsViewer({ sellerEmail: session?.user?.email || "", sellerName: session?.user?.name || "You" })} className="flex items-center gap-3 bg-white/90 backdrop-blur px-5 py-3 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                 <div className="text-left leading-tight">
+                   <p className="text-[10px] font-bold text-[#11998e] uppercase tracking-wider">Buyer Feedback</p>
+                   <p className="text-sm font-bold text-[#1a2a3a]">Your Rating</p>
+                 </div>
+                 <span className="text-xl font-bold text-amber-500 bg-amber-50 px-3 py-1 rounded-xl border border-amber-100 flex items-center gap-1.5">
+                   ⭐ {avgRating} {avgRating !== "New" && <span className="text-xs text-amber-700 font-medium">({reviews.length})</span>}
+                 </span>
+               </button>
+             );
+          })()}
         </div>
 
         {/* Tab Navigation */}
@@ -806,6 +846,55 @@ export default function DashboardPage() {
         @keyframes slideUp { from { opacity: 0; transform: translateY(40px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
       `}</style>
+      
+      {/* ══ REVIEWS VIEWER MODAL ══ */}
+      {showReviewsViewer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowReviewsViewer(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between shadow-sm relative z-10">
+              <div>
+                <h2 className="font-bold text-[#1a2a3a]">Your Reviews</h2>
+                <p className="text-xs text-[#9ca3af]">What buyers are saying about your fish</p>
+              </div>
+              <button onClick={() => setShowReviewsViewer(null)} className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4 bg-slate-50">
+              {reviews.filter(r => r.sellerEmail === showReviewsViewer.sellerEmail).length === 0 ? (
+                <div className="text-center py-12 text-[#9ca3af]">
+                  <p className="text-4xl mb-3">⭐</p>
+                  <p className="font-medium text-[#1a2a3a]">No reviews yet.</p>
+                  <p className="text-xs mt-1">Complete deals with buyers to get reviews!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.filter(r => r.sellerEmail === showReviewsViewer.sellerEmail).map(r => (
+                    <div key={r._id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-bold text-sm text-[#1a2a3a]">{r.buyerName}</p>
+                          <p className="text-[10px] text-[#9ca3af]">Bought: <span className="font-medium text-[#11998e]">{r.fishName}</span></p>
+                        </div>
+                        <div className="flex" title={`${r.rating} stars`}>
+                          {[1,2,3,4,5].map(star => (
+                            <span key={star} className={`text-xs ${star <= r.rating ? "text-amber-500" : "text-slate-200"}`}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-sm text-[#3a4a5a] relative">
+                        <span className="text-slate-200 text-2xl absolute -left-1 -top-2">"</span>
+                        <span className="relative z-10 pl-3 block">{r.comment}</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-3 text-right">{new Date(r.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

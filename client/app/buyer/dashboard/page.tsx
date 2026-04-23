@@ -23,6 +23,17 @@ interface SellerData {
   profileComplete?: boolean;
 }
 
+interface Review {
+  _id: string;
+  buyerEmail: string;
+  buyerName: string;
+  sellerEmail: string;
+  fishName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 interface FishListing {
   _id: string;
   sellerEmail: string;
@@ -160,6 +171,13 @@ export default function BuyerDashboard() {
   const [selectedSeller, setSelectedSeller] = useState<SellerData | null>(null);
   const [showDealModal, setShowDealModal] = useState(false);
 
+  // Review state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showReviewsViewer, setShowReviewsViewer] = useState<{sellerEmail: string, sellerName: string} | null>(null);
+  const [reviewForm, setReviewForm] = useState({ sellerEmail: "", fishName: "", rating: 5, comment: "" });
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   // Message state
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -229,11 +247,13 @@ export default function BuyerDashboard() {
     fetchConversations();
     fetchDeals();
     fetchProfile();
+    fetchReviews();
 
     // Poll conversations every 3 seconds for real-time feel
     convPollingRef.current = setInterval(() => {
       fetchConversations();
       fetchFishListings();
+      fetchReviews();
     }, 3000);
 
     return () => {
@@ -297,6 +317,15 @@ export default function BuyerDashboard() {
     } catch (err) {
       console.error("Error fetching deals:", err);
     }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const res = await fetch("/api/reviews");
+      if (res.ok) {
+         setReviews(await res.json());
+      }
+    } catch (err) { console.error("Error fetching reviews:", err); }
   };
 
   const fetchProfile = async () => {
@@ -451,6 +480,25 @@ export default function BuyerDashboard() {
       console.error("Error saving profile:", err);
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!reviewForm.rating || !reviewForm.comment) return;
+    setSubmittingReview(true);
+    try {
+      await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reviewForm),
+      });
+      setShowReviewModal(false);
+      setReviewForm({ sellerEmail: "", fishName: "", rating: 5, comment: "" });
+      fetchReviews();
+    } catch (err) {
+      console.error("Error submitting review:", err);
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -721,6 +769,19 @@ export default function BuyerDashboard() {
                               </p>
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#3a7bd5]/10 text-[#3a7bd5] shrink-0">Dealer</span>
+                            
+                            {/* Review stars */}
+                            {(() => {
+                              const sellerReviews = reviews.filter(r => r.sellerEmail === listing.sellerEmail);
+                              const avgRating = sellerReviews.length ? (sellerReviews.reduce((sum, r) => sum + r.rating, 0) / sellerReviews.length).toFixed(1) : "New";
+                              return (
+                                <button onClick={(e) => { e.stopPropagation(); setShowReviewsViewer({ sellerEmail: listing.sellerEmail, sellerName: listing.sellerName }); }} className="hover:opacity-80 transition-opacity ml-1">
+                                  <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-2 rounded-full border border-amber-200 flex items-center gap-1">
+                                    ⭐ {avgRating} {avgRating !== "New" && <span className="text-amber-700">({sellerReviews.length})</span>}
+                                  </span>
+                                </button>
+                              );
+                            })()}
                           </div>
 
                           {/* Action Buttons */}
@@ -959,6 +1020,14 @@ export default function BuyerDashboard() {
                               Cancel
                             </button>
                           )}
+                          {deal.status === "completed" && (
+                            <button onClick={() => {
+                              setReviewForm({ sellerEmail: deal.sellerEmail, fishName: deal.fishType, rating: 5, comment: "" });
+                              setShowReviewModal(true);
+                            }} className="text-xs font-bold text-white bg-gradient-to-r from-amber-400 to-orange-500 hover:opacity-90 px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1">
+                              ⭐ Leave Review
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1107,6 +1176,85 @@ export default function BuyerDashboard() {
         @keyframes slideUp { from { opacity: 0; transform: translateY(40px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
       `}</style>
+      
+      {/* ══ LEAVE REVIEW MODAL ══ */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowReviewModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden relative" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-6 text-white text-center">
+              <p className="text-4xl mb-2">⭐</p>
+              <h2 className="text-xl font-bold">Leave Feedback</h2>
+              <p className="text-white/80 text-sm mt-1">Review {reviewForm.fishName}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-2">Rating</label>
+                <div className="flex justify-center gap-2">
+                  {[1,2,3,4,5].map(star => (
+                    <button key={star} onClick={() => setReviewForm(prev => ({...prev, rating: star}))} className="text-4xl transition-all hover:scale-110">
+                      {star <= reviewForm.rating ? "⭐" : "☆"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Your Feedback</label>
+                <textarea rows={3} value={reviewForm.comment} onChange={(e) => setReviewForm(prev => ({...prev, comment: e.target.value}))} placeholder="How was the quality of the fish? How was the seller?" className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-amber-500/30 resize-none" />
+              </div>
+            </div>
+            <div className="p-6 flex gap-3 bg-slate-50 border-t border-slate-100">
+              <button onClick={() => setShowReviewModal(false)} className="flex-1 py-3 rounded-xl font-bold text-[#1a2a3a] border border-slate-200 hover:bg-slate-100 transition-all text-sm">Cancel</button>
+              <button onClick={submitReview} disabled={!reviewForm.comment.trim() || submittingReview} className="flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-amber-400 to-orange-500 hover:shadow-lg hover:opacity-90 transition-all text-sm disabled:opacity-50">
+                {submittingReview ? "Submitting..." : "Submit Review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ REVIEWS VIEWER MODAL ══ */}
+      {showReviewsViewer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowReviewsViewer(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between shadow-sm relative z-10">
+              <div>
+                <h2 className="font-bold text-[#1a2a3a]">Reviews for {showReviewsViewer.sellerName}</h2>
+              </div>
+              <button onClick={() => setShowReviewsViewer(null)} className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4 bg-slate-50">
+              {reviews.filter(r => r.sellerEmail === showReviewsViewer.sellerEmail).length === 0 ? (
+                <div className="text-center py-12 text-[#9ca3af]">
+                  <p className="text-4xl mb-3">⭐</p>
+                  <p className="font-medium text-[#1a2a3a]">No reviews yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.filter(r => r.sellerEmail === showReviewsViewer.sellerEmail).map(r => (
+                    <div key={r._id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-bold text-sm text-[#1a2a3a]">{r.buyerName}</p>
+                          <p className="text-[10px] text-[#9ca3af]">Bought: <span className="font-medium text-[#3a7bd5]">{r.fishName}</span></p>
+                        </div>
+                        <div className="flex" title={`${r.rating} stars`}>
+                          {[1,2,3,4,5].map(star => (
+                            <span key={star} className={`text-xs ${star <= r.rating ? "text-amber-500" : "text-slate-200"}`}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-sm text-[#3a4a5a]">{r.comment}</p>
+                      <p className="text-[10px] text-slate-400 mt-3">{new Date(r.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

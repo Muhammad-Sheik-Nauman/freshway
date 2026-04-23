@@ -23,6 +23,24 @@ interface SellerData {
   profileComplete?: boolean;
 }
 
+interface FishListing {
+  _id: string;
+  sellerEmail: string;
+  sellerName: string;
+  sellerImage?: string;
+  businessName: string;
+  location: string;
+  fishName: string;
+  description: string;
+  pricePerKg: number;
+  availableQuantity: number;
+  unit: string;
+  freshness: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 interface Conversation {
   partnerEmail: string;
   partnerName: string;
@@ -40,6 +58,7 @@ interface Message {
   senderName: string;
   recipientEmail: string;
   content: string;
+  imageUrl?: string;
   createdAt: string;
 }
 
@@ -130,9 +149,14 @@ export default function BuyerDashboard() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [profile, setProfile] = useState<any>(null);
 
+  // Fish listings state
+  const [fishListings, setFishListings] = useState<FishListing[]>([]);
+  const [fishListingsLoading, setFishListingsLoading] = useState(true);
+
   // Marketplace state
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"rating" | "deliveries" | "name">("rating");
+  const [availabilityFilter, setAvailabilityFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"latest" | "price_low" | "price_high" | "name">("latest");
   const [selectedSeller, setSelectedSeller] = useState<SellerData | null>(null);
   const [showDealModal, setShowDealModal] = useState(false);
 
@@ -140,16 +164,49 @@ export default function BuyerDashboard() {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [messageImage, setMessageImage] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const convPollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxSize = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > maxSize) {
+          height *= maxSize / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width *= maxSize / height;
+          height = maxSize;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        callback(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Deal form state
   const [dealForm, setDealForm] = useState({
     fishType: "",
     quantity: "",
     pricePerUnit: "",
-    deliveryDate: "",
     deliveryLocation: "",
     notes: "",
   });
@@ -168,12 +225,16 @@ export default function BuyerDashboard() {
   // ── Data fetching ───────────────────────────────────
   useEffect(() => {
     fetchSellers();
+    fetchFishListings();
     fetchConversations();
     fetchDeals();
     fetchProfile();
 
     // Poll conversations every 3 seconds for real-time feel
-    convPollingRef.current = setInterval(fetchConversations, 3000);
+    convPollingRef.current = setInterval(() => {
+      fetchConversations();
+      fetchFishListings();
+    }, 3000);
 
     return () => {
       if (convPollingRef.current) clearInterval(convPollingRef.current);
@@ -197,6 +258,20 @@ export default function BuyerDashboard() {
       console.error("Error fetching sellers:", err);
     } finally {
       setSellersLoading(false);
+    }
+  };
+
+  const fetchFishListings = async () => {
+    try {
+      const res = await fetch("/api/fish-listings");
+      if (res.ok) {
+        const data = await res.json();
+        setFishListings(data);
+      }
+    } catch (err) {
+      console.error("Error fetching fish listings:", err);
+    } finally {
+      setFishListingsLoading(false);
     }
   };
 
@@ -271,9 +346,11 @@ export default function BuyerDashboard() {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !activeChat) return;
+    if ((!newMessage.trim() && !messageImage) || !activeChat) return;
     const msgContent = newMessage;
+    const imgUrl = messageImage;
     setNewMessage("");
+    setMessageImage(null);
 
     // Optimistic update
     const optimistic: Message = {
@@ -282,6 +359,7 @@ export default function BuyerDashboard() {
       senderName: session?.user?.name || "",
       recipientEmail: activeChat,
       content: msgContent,
+      imageUrl: imgUrl || undefined,
       createdAt: new Date().toISOString(),
     };
     setChatMessages(prev => [...prev, optimistic]);
@@ -290,7 +368,7 @@ export default function BuyerDashboard() {
       await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipientEmail: activeChat, content: msgContent }),
+        body: JSON.stringify({ recipientEmail: activeChat, content: msgContent, imageUrl: imgUrl }),
       });
       // Refresh from server
       fetchChatMessages(activeChat);
@@ -298,6 +376,22 @@ export default function BuyerDashboard() {
     } catch (err) {
       console.error("Error sending message:", err);
     }
+  };
+
+  const deleteMessage = async (msgId: string) => {
+    try {
+      await fetch(`/api/messages?messageId=${msgId}`, { method: "DELETE" });
+      if (activeChat) fetchChatMessages(activeChat);
+    } catch (err) { console.error(err); }
+  };
+
+  const deleteConversation = async (email: string) => {
+    if (!confirm("Are you sure you want to delete this conversation?")) return;
+    try {
+      await fetch(`/api/messages?partnerEmail=${email}`, { method: "DELETE" });
+      setActiveChat(null);
+      fetchConversations();
+    } catch (err) { console.error(err); }
   };
 
   const startChatWithSeller = (email: string) => {
@@ -318,13 +412,12 @@ export default function BuyerDashboard() {
           fishType: dealForm.fishType,
           quantity: Number(dealForm.quantity),
           pricePerUnit: Number(dealForm.pricePerUnit),
-          deliveryDate: dealForm.deliveryDate,
           deliveryLocation: dealForm.deliveryLocation,
           notes: dealForm.notes,
         }),
       });
       setShowDealModal(false);
-      setDealForm({ fishType: "", quantity: "", pricePerUnit: "", deliveryDate: "", deliveryLocation: "", notes: "" });
+      setDealForm({ fishType: "", quantity: "", pricePerUnit: "", deliveryLocation: "", notes: "" });
       fetchDeals();
       setActiveTab("deals");
     } catch (err) {
@@ -361,21 +454,31 @@ export default function BuyerDashboard() {
     }
   };
 
-  // Filter & sort sellers
-  const filteredSellers = sellers
-    .filter((s) => {
+  // Filter & sort fish listings
+  const filteredListings = fishListings
+    .filter((l) => {
       const q = search.toLowerCase();
-      return (
-        (s.displayName || s.name || "").toLowerCase().includes(q) ||
-        (s.businessName || "").toLowerCase().includes(q) ||
-        (s.location || "").toLowerCase().includes(q) ||
-        (s.fishTypes || []).some((f) => f.toLowerCase().includes(q))
+      const matchesSearch = (
+        l.fishName.toLowerCase().includes(q) ||
+        l.sellerName.toLowerCase().includes(q) ||
+        (l.businessName || "").toLowerCase().includes(q) ||
+        (l.location || "").toLowerCase().includes(q) ||
+        (l.description || "").toLowerCase().includes(q) ||
+        (l.availability || "").toLowerCase().includes(q)
       );
+
+      let matchesAvail = true;
+      if (availabilityFilter.trim() !== "") {
+        matchesAvail = (l.availability || "").toLowerCase().includes(availabilityFilter.toLowerCase());
+      }
+
+      return matchesSearch && matchesAvail;
     })
     .sort((a, b) => {
-      if (sortBy === "rating") return (b.rating || 0) - (a.rating || 0);
-      if (sortBy === "deliveries") return (b.totalDeliveries || 0) - (a.totalDeliveries || 0);
-      return (a.displayName || a.name || "").localeCompare(b.displayName || b.name || "");
+      if (sortBy === "latest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (sortBy === "price_low") return (a.pricePerKg || 0) - (b.pricePerKg || 0);
+      if (sortBy === "price_high") return (b.pricePerKg || 0) - (a.pricePerKg || 0);
+      return a.fishName.localeCompare(b.fishName);
     });
 
   const dealStatusStyle: Record<string, { bg: string; text: string; dot: string }> = {
@@ -461,22 +564,39 @@ export default function BuyerDashboard() {
                 <input
                   id="marketplace-search"
                   type="text"
-                  placeholder="Search sellers, fish types, locations..."
+                  placeholder="Search fish, availability, sellers..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-white/90 backdrop-blur text-sm text-[#1a2a3a] placeholder-[#9ca3af] focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30 shadow-sm"
                 />
+              </div>
+              <div className="relative w-full sm:w-48">
+                <input
+                  type="text"
+                  list="filterAvailabilityOptions"
+                  value={availabilityFilter}
+                  onChange={(e) => setAvailabilityFilter(e.target.value)}
+                  placeholder="Filter Availability..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white/90 text-sm text-[#1a2a3a] font-medium focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30 shadow-sm"
+                />
+                <datalist id="filterAvailabilityOptions">
+                  <option value="Available Today" />
+                  <option value="Available Tomorrow" />
+                  <option value="In 2 Days" />
+                  <option value="In 3+ Days" />
+                </datalist>
               </div>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="px-4 py-3 rounded-xl border border-slate-200 bg-white/90 text-sm text-[#1a2a3a] font-semibold focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30 shadow-sm cursor-pointer"
               >
-                <option value="rating">Sort: Top Rated</option>
-                <option value="deliveries">Sort: Most Deliveries</option>
-                <option value="name">Sort: Name (A-Z)</option>
+                <option value="latest">Sort: Latest</option>
+                <option value="price_low">Sort: Price (Low → High)</option>
+                <option value="price_high">Sort: Price (High → Low)</option>
+                <option value="name">Sort: Fish Name (A-Z)</option>
               </select>
-              <button onClick={fetchSellers} className="px-4 py-3 rounded-xl border border-slate-200 bg-white/90 text-sm text-[#3a7bd5] font-semibold hover:bg-[#3a7bd5]/5 transition-all shadow-sm flex items-center gap-2">
+              <button onClick={() => { fetchFishListings(); fetchSellers(); }} className="px-4 py-3 rounded-xl border border-slate-200 bg-white/90 text-sm text-[#3a7bd5] font-semibold hover:bg-[#3a7bd5]/5 transition-all shadow-sm flex items-center gap-2">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                 Refresh
               </button>
@@ -485,9 +605,9 @@ export default function BuyerDashboard() {
             {/* Stats Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
               {[
-                { label: "Total Sellers", value: sellers.length, icon: "🏪", bg: "bg-blue-50", color: "text-[#3a7bd5]" },
+                { label: "Fish Listed", value: fishListings.length, icon: "🐟", bg: "bg-blue-50", color: "text-[#3a7bd5]" },
                 { label: "Active Deals", value: deals.filter(d => d.status === "pending" || d.status === "accepted").length, icon: "📋", bg: "bg-amber-50", color: "text-amber-600" },
-                { label: "Messages", value: conversations.length, icon: "💬", bg: "bg-emerald-50", color: "text-emerald-600" },
+                { label: "Sellers", value: sellers.length, icon: "🏪", bg: "bg-emerald-50", color: "text-emerald-600" },
                 { label: "Completed", value: deals.filter(d => d.status === "completed").length, icon: "✅", bg: "bg-purple-50", color: "text-purple-600" },
               ].map((stat) => (
                 <div key={stat.label} className={`${stat.bg} rounded-2xl p-4 border border-white/60 shadow-sm`}>
@@ -498,103 +618,142 @@ export default function BuyerDashboard() {
               ))}
             </div>
 
-            {/* Seller Cards Grid */}
-            {sellersLoading ? (
+            {/* Fish Listing Cards */}
+            {fishListingsLoading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="flex flex-col items-center gap-3">
                   <svg className="animate-spin h-8 w-8 text-[#3a7bd5]" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  <p className="text-sm text-[#3a4a5a] font-medium">Loading sellers...</p>
+                  <p className="text-sm text-[#3a4a5a] font-medium">Loading fish listings...</p>
                 </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                {filteredSellers.length === 0 ? (
+                {filteredListings.length === 0 ? (
                   <div className="col-span-3 text-center py-20 text-[#9ca3af]">
-                    <p className="text-5xl mb-3">🏪</p>
-                    <p className="font-bold text-lg text-[#1a2a3a] mb-1">No sellers in the marketplace yet</p>
-                    <p className="text-sm">Sellers will appear here once they register and set up their profile.</p>
+                    <p className="text-5xl mb-3">🐟</p>
+                    <p className="font-bold text-lg text-[#1a2a3a] mb-1">No fish listings yet</p>
+                    <p className="text-sm">Sellers will post their fish for sale here. Check back soon!</p>
                   </div>
                 ) : (
-                  filteredSellers.map((seller) => {
-                    const initials = (seller.displayName || seller.name || "?")
+                  filteredListings.map((listing, idx) => {
+                    const gradient = gradients[idx % gradients.length];
+                    const sellerInitials = (listing.sellerName || "?")
                       .split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-                    const gradient = gradients[Math.abs((seller._id || "").charCodeAt(0)) % gradients.length];
+
+                    // Freshness badge color
+                    const freshnessStyle: Record<string, { bg: string; dot: string }> = {
+                      "Fresh": { bg: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
+                      "Day-old": { bg: "bg-amber-100 text-amber-700", dot: "bg-amber-400" },
+                      "Frozen": { bg: "bg-blue-100 text-blue-700", dot: "bg-blue-500" },
+                    };
+                    const fStyle = freshnessStyle[listing.freshness] || freshnessStyle["Fresh"];
 
                     return (
-                      <div key={seller._id} className="group bg-white/90 backdrop-blur-xl rounded-2xl shadow-md border border-white/50 p-6 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-                        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${gradient}`} />
+                      <div key={listing._id} className="group bg-white/90 backdrop-blur-xl rounded-2xl shadow-md border border-white/50 overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 relative">
+                        {/* Top gradient strip */}
+                        <div className={`h-1.5 bg-gradient-to-r ${gradient}`} />
 
-                        {/* Header */}
-                        <div className="flex items-start gap-4 mb-4">
-                          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0`}>
-                            {seller.image ? (
-                              <img src={seller.image} alt="" className="w-full h-full rounded-xl object-cover" referrerPolicy="no-referrer" />
-                            ) : initials}
+                        <div className="p-6">
+                          {/* Freshness & time badge */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${fStyle.bg}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${fStyle.dot}`}></span>
+                                {listing.freshness}
+                              </span>
+                              {listing.availability && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                  ⏱ {listing.availability}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-[#9ca3af] font-medium">
+                              {new Date(listing.createdAt).toLocaleDateString()}
+                            </span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h2 className="font-bold text-[#1a2a3a] text-base truncate">
-                              {seller.displayName || seller.name || "Seller"}
-                            </h2>
-                            <p className="text-sm text-[#3a4a5a] truncate">{seller.businessName || "Fish Seller"}</p>
-                          </div>
-                          {seller.rating && <StarRating rating={seller.rating} />}
-                        </div>
 
-                        {/* Location */}
-                        {seller.location && (
-                          <div className="flex items-center gap-2 text-sm text-[#3a4a5a] mb-3">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a7bd5" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-                            <span>{seller.location}</span>
-                          </div>
-                        )}
+                          {/* ═══ FISH NAME ═══ HIGHLIGHTED */}
+                          <h2 className="text-2xl font-extrabold mb-1">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="text-2xl">🐟</span>
+                              <span className={`bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>
+                                {listing.fishName}
+                              </span>
+                            </span>
+                          </h2>
 
-                        {/* Bio */}
-                        {seller.bio && (
-                          <p className="text-xs text-[#3a4a5a] leading-relaxed mb-3 line-clamp-2">{seller.bio}</p>
-                        )}
+                          {/* Image preview */}
+                          {listing.imageUrl && (
+                            <div className="mb-3 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex items-center justify-center bg-slate-50 relative aspect-video h-36 w-full">
+                              <img src={listing.imageUrl} alt={listing.fishName} className="object-cover w-full h-full" />
+                            </div>
+                          )}
 
-                        {/* Fish types */}
-                        {seller.fishTypes && seller.fishTypes.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
-                            {seller.fishTypes.slice(0, 4).map((f) => (
-                              <span key={f} className="text-[11px] bg-slate-100 text-[#3a4a5a] px-2.5 py-1 rounded-full font-medium">🐟 {f}</span>
-                            ))}
-                            {seller.fishTypes.length > 4 && (
-                              <span className="text-[11px] bg-slate-100 text-[#9ca3af] px-2.5 py-1 rounded-full font-medium">+{seller.fishTypes.length - 4} more</span>
+                          {/* Description */}
+                          {listing.description && (
+                            <p className="text-xs text-[#3a4a5a] leading-relaxed mb-3 line-clamp-2">{listing.description}</p>
+                          )}
+
+                          {/* Price & Quantity */}
+                          <div className="flex flex-wrap gap-3 mb-4">
+                            <span className="inline-flex items-center gap-1 text-sm font-bold text-[#1a2a3a] bg-slate-50 px-3 py-1.5 rounded-lg">
+                              💰 ₹{listing.pricePerKg}/{listing.unit}
+                            </span>
+                            {listing.availableQuantity > 0 && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-[#3a4a5a] bg-slate-50 px-3 py-1.5 rounded-lg">
+                                📦 {listing.availableQuantity} {listing.unit} available
+                              </span>
                             )}
                           </div>
-                        )}
 
-                        {/* Price Range */}
-                        {seller.priceRange && (
-                          <div className="flex items-center gap-2 text-xs text-[#3a4a5a] mb-4">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#11998e" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                            <span className="font-medium">{seller.priceRange}</span>
+                          {/* ═══ SELLER / DEALER ═══ */}
+                          <div className="flex items-center gap-3 p-3 bg-slate-50/80 rounded-xl mb-4">
+                            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-xs shadow-sm shrink-0`}>
+                              {listing.sellerImage ? (
+                                <img src={listing.sellerImage} alt="" className="w-full h-full rounded-lg object-cover" referrerPolicy="no-referrer" />
+                              ) : sellerInitials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-[#1a2a3a] truncate">{listing.sellerName}</p>
+                              <p className="text-[10px] text-[#3a4a5a] truncate">
+                                {listing.businessName || "Fish Seller"}
+                                {listing.location ? ` · ${listing.location}` : ""}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#3a7bd5]/10 text-[#3a7bd5] shrink-0">Dealer</span>
                           </div>
-                        )}
 
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 pt-3 border-t border-slate-100">
-                          <button
-                            onClick={() => startChatWithSeller(seller.email)}
-                            className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-[#3a7bd5] hover:bg-[#3a7bd5]/5 transition-all flex items-center justify-center gap-1.5"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-                            Message
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedSeller(seller);
-                              setShowDealModal(true);
-                              if (seller.fishTypes && seller.fishTypes.length > 0) {
-                                setDealForm(prev => ({ ...prev, fishType: seller.fishTypes![0] }));
-                              }
-                            }}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r ${gradient} hover:opacity-90 transition-all flex items-center justify-center gap-1.5`}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                            Make Deal
-                          </button>
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startChatWithSeller(listing.sellerEmail)}
+                              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-[#3a7bd5] hover:bg-[#3a7bd5]/5 transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                              Message
+                            </button>
+                            <button
+                              onClick={() => {
+                                // Find seller data to populate deal modal
+                                const sellerData = sellers.find(s => s.email === listing.sellerEmail);
+                                const fakeSellerForDeal: SellerData = sellerData || {
+                                  _id: listing._id,
+                                  name: listing.sellerName,
+                                  email: listing.sellerEmail,
+                                  displayName: listing.sellerName,
+                                  businessName: listing.businessName,
+                                  fishTypes: [listing.fishName],
+                                };
+                                setSelectedSeller(fakeSellerForDeal);
+                                setDealForm(prev => ({ ...prev, fishType: listing.fishName, pricePerUnit: String(listing.pricePerKg) }));
+                                setShowDealModal(true);
+                              }}
+                              className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r ${gradient} hover:opacity-90 transition-all flex items-center justify-center gap-1.5`}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                              Make Deal
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -665,44 +824,50 @@ export default function BuyerDashboard() {
                 <>
                   <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#3a7bd5] to-[#00d2ff] flex items-center justify-center text-white text-xs font-bold">
-                        {(conversations.find(c => c.partnerEmail === activeChat)?.partnerName || activeChat)
-                          .split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#11998e] to-[#38ef7d] flex items-center justify-center text-white text-xs font-bold shadow-md">
+                        {(conversations.find(c => c.partnerEmail === activeChat)?.partnerName || "?").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-bold text-sm text-[#1a2a3a]">
-                          {conversations.find(c => c.partnerEmail === activeChat)?.partnerName || activeChat}
-                        </p>
-                        <p className="text-xs text-[#9ca3af]">
-                          {conversations.find(c => c.partnerEmail === activeChat)?.partnerBusiness || "Seller"}
-                        </p>
+                        <p className="font-bold text-[#1a2a3a]">{conversations.find(c => c.partnerEmail === activeChat)?.partnerName || activeChat}</p>
+                        <p className="text-xs text-[#9ca3af]">{conversations.find(c => c.partnerEmail === activeChat)?.partnerBusiness || "Seller"}</p>
                       </div>
                     </div>
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Real-time
-                    </span>
+                    <div className="flex gap-2 items-center">
+                      <span className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold bg-emerald-50 px-2.5 py-1 rounded-full mr-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Real-time
+                      </span>
+                      <button onClick={() => deleteConversation(activeChat)} className="text-xs font-semibold px-2.5 py-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                        🗑 Delete Chat
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex-1 p-4 overflow-y-auto space-y-3 max-h-[380px] min-h-[200px]">
+                  <div className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[380px] min-h-[200px] scroll-smooth">
                     {chatMessages.length === 0 ? (
                       <div className="text-center py-12 text-[#9ca3af]">
-                        <p className="text-3xl mb-2">👋</p>
-                        <p className="text-sm">Start a conversation! Messages update in real-time.</p>
+                        <p className="text-4xl mb-3">👋</p>
+                        <p className="text-sm font-medium">Say hello!</p>
                       </div>
                     ) : (
                       chatMessages.map((msg, idx) => {
                         const isMine = msg.senderEmail === session?.user?.email;
                         return (
-                          <div key={msg._id || idx} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
-                              isMine
-                                ? "bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white rounded-tr-md"
-                                : "bg-slate-100 text-[#1a2a3a] rounded-tl-md"
+                          <div key={msg._id || idx} className={`flex flex-col group ${isMine ? "items-end" : "items-start"}`}>
+                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm relative shadow-sm ${
+                              isMine ? "bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white rounded-br-sm" : "bg-white border border-slate-100 text-[#1a2a3a] rounded-bl-sm"
                             }`}>
+                              {msg.imageUrl && (
+                                <img src={msg.imageUrl} alt="attached" className="max-w-full rounded-xl mb-2 aspect-auto border border-white/20" />
+                              )}
                               {msg.content}
-                              <div className={`text-[10px] mt-1 ${isMine ? "text-white/60" : "text-[#9ca3af]"}`}>
+                              <div className={`text-[10px] mt-1.5 ${isMine ? "text-white/70" : "text-[#9ca3af]"}`}>
                                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                               </div>
+                              {isMine && !msg._id?.startsWith("temp-") && (
+                                <button onClick={() => deleteMessage(msg._id)} className="absolute top-2 -left-8 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-red-100 text-red-500 rounded-full hover:bg-red-200">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -710,21 +875,22 @@ export default function BuyerDashboard() {
                     )}
                     <div ref={chatEndRef} />
                   </div>
-
-                  <div className="p-4 border-t border-slate-100 flex gap-2">
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                      placeholder="Type a message..."
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30"
-                    />
-                    <button
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim()}
-                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50"
-                    >
+                    {messageImage && (
+                    <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 relative">
+                      <button onClick={() => setMessageImage(null)} className="absolute top-1 right-2 bg-red-500 text-white rounded-full p-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
+                      <img src={messageImage} alt="preview" className="h-16 w-auto rounded border border-slate-200" />
+                    </div>
+                  )}
+                  <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex gap-3 items-center relative">
+                    <label className="cursor-pointer text-[#9ca3af] hover:text-[#11998e] transition-colors p-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setMessageImage)} />
+                    </label>
+                    <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && sendMessage()} placeholder="Type your message..."
+                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30 bg-white shadow-sm" />
+                    <button onClick={sendMessage} disabled={!newMessage.trim() && !messageImage}
+                      className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white font-bold text-sm hover:opacity-90 transition-all shadow-md disabled:opacity-50 disabled:shadow-none">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     </button>
                   </div>
@@ -890,16 +1056,10 @@ export default function BuyerDashboard() {
 
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
               <div>
-                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Fish Type *</label>
-                {selectedSeller.fishTypes && selectedSeller.fishTypes.length > 0 ? (
-                  <select value={dealForm.fishType} onChange={(e) => setDealForm(prev => ({ ...prev, fishType: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] bg-white focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30">
-                    {selectedSeller.fishTypes.map((f) => (<option key={f} value={f}>{f}</option>))}
-                  </select>
-                ) : (
-                  <input type="text" value={dealForm.fishType} onChange={(e) => setDealForm(prev => ({ ...prev, fishType: e.target.value }))} placeholder="e.g. Tuna, Mackerel"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30" />
-                )}
+                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Fish Type</label>
+                <div className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-[#1a2a3a] font-semibold">
+                  🐟 {dealForm.fishType || "Selected Fish"}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -919,11 +1079,6 @@ export default function BuyerDashboard() {
                   <span className="text-lg font-bold text-emerald-700">₹{(Number(dealForm.quantity) * Number(dealForm.pricePerUnit)).toLocaleString()}</span>
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Delivery Date</label>
-                <input type="date" value={dealForm.deliveryDate} onChange={(e) => setDealForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#3a7bd5]/30" />
-              </div>
               <div>
                 <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Delivery Location</label>
                 <input type="text" value={dealForm.deliveryLocation} onChange={(e) => setDealForm(prev => ({ ...prev, deliveryLocation: e.target.value }))} placeholder="Your delivery address"

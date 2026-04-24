@@ -159,6 +159,8 @@ export default function ContactPage() {
                     >
                       <option value="" disabled>Select a topic…</option>
                       <option value="General Inquiry">General Inquiry</option>
+                      <option value="Marketplace Issue">Marketplace Issue</option>
+                      <option value="Seller Support">Seller Support</option>
                       <option value="Technical Support">Technical Support</option>
                       <option value="Partnership">Partnership / Business</option>
                       <option value="Bug Report">Bug Report</option>

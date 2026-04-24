@@ -64,39 +64,39 @@ const LandingPage = () => {
 
   const features = [
     {
-      icon: "📷",
-      title: "Capture & Analyze",
-      desc: "Take a photo of the fish eye with any camera. Our AI delivers results in under 3 seconds.",
+      icon: "🏪",
+      title: "Dynamic Marketplace",
+      desc: "Browse a real-time marketplace of seafood listings. Connect with verified sellers directly and negotiate deals.",
       color: "from-[#3a7bd5] to-[#00d2ff]",
       bg: "bg-blue-50",
     },
     {
       icon: "🧠",
-      title: "AI-Powered Detection",
-      desc: "MobileNetV2 deep learning model trained on thousands of real fish samples with 95%+ accuracy.",
+      title: "AI Quality Verification",
+      desc: "Our MobileNetV2 deep learning model analyzes fish eye photos to instantly verify freshness before you buy.",
       color: "from-purple-500 to-pink-400",
       bg: "bg-purple-50",
     },
     {
-      icon: "🚚",
-      title: "Supply Chain Ready",
-      desc: "Manage seller contracts, track distances, prices, and delivery history all in one place.",
+      icon: "💬",
+      title: "Real-time Messaging",
+      desc: "Communicate securely with buyers and sellers. Negotiate prices and finalize deals without leaving the platform.",
       color: "from-[#11998e] to-[#38ef7d]",
       bg: "bg-emerald-50",
     },
     {
-      icon: "📊",
-      title: "Detailed Reports",
-      desc: "Get confidence scores, market route recommendations, and per-class freshness breakdowns.",
+      icon: "⭐",
+      title: "Transparent Reviews",
+      desc: "Build trust with a comprehensive rating system. Read reviews from previous buyers to make informed decisions.",
       color: "from-orange-400 to-red-400",
       bg: "bg-orange-50",
     },
   ];
 
   const steps = [
-    { num: "01", title: "Upload a Photo", desc: "Take or upload a close-up photo of the fish eye using your device.", icon: "📸" },
-    { num: "02", title: "AI Analyzes It", desc: "Our MobileNetV2 model processes the image in seconds.", icon: "⚡" },
-    { num: "03", title: "Get Your Result", desc: "Instantly see freshness status, confidence score & market route.", icon: "✅" },
+    { num: "01", title: "Create Your Profile", desc: "Sign up and choose your role as a Buyer or Seller in our marketplace.", icon: "👤" },
+    { num: "02", title: "List or Discover", desc: "Sellers list catches with AI freshness proof. Buyers browse the market.", icon: "🛒" },
+    { num: "03", title: "Connect & Transact", desc: "Chat, finalize deals, and leave transparent reviews to build trust.", icon: "🤝" },
   ];
 
   return (
@@ -111,22 +111,21 @@ const LandingPage = () => {
         <Navbar />
 
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 py-20">
-          {/* Label pill */}
           <div className="flex items-center gap-2 bg-[#3a7bd5]/10 border border-[#3a7bd5]/20 text-[#3a7bd5] text-xs sm:text-sm font-semibold px-4 py-2 rounded-full mb-6 backdrop-blur-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-            AI Model Live — Real-time Fish Freshness Detection
+            The Premier AI-Powered Seafood Marketplace
           </div>
 
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[#1a2a3a] mb-4 leading-tight max-w-3xl">
-            Know If Your Fish Is
+            Buy & Sell Seafood with
             <span className="block bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] bg-clip-text text-transparent">
-              Fresh in Seconds
+              AI Freshness & Total Confidence
             </span>
           </h1>
 
           <p className="text-[#3a4a5a] text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            FreshWay uses deep learning to instantly assess fish freshness from a single photo — eliminating guesswork and reducing waste across Mangalore's seafood supply chain.
+            FreshWay connects buyers and sellers in a transparent marketplace. We use AI to instantly verify fish freshness, ensuring you get the highest quality seafood every time.
           </p>
 
           {/* CTA Buttons */}
@@ -201,13 +200,12 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* ── STATS SECTION ─────────────────────────────────── */}
       <div className="bg-gradient-to-r from-[#1a2a3a] to-[#3a7bd5] py-14 px-4">
         <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8">
-          <StatItem value={95} suffix="%" label="Model Accuracy" />
-          <StatItem value={3} suffix="s" label="Avg. Analysis Time" />
-          <StatItem value={3} suffix="" label="Freshness Classes" />
-          <StatItem value={100} suffix="%" label="Open Source" />
+          <StatItem value={500} suffix="+" label="Active Buyers & Sellers" />
+          <StatItem value={95} suffix="%" label="AI Accuracy" />
+          <StatItem value={100} suffix="K+" label="Deals Closed" />
+          <StatItem value={4.9} suffix="/5" label="Average Rating" />
         </div>
       </div>
 
@@ -220,7 +218,7 @@ const LandingPage = () => {
             </span>
             <h2 className="text-3xl sm:text-4xl font-bold text-[#1a2a3a] mb-3">Everything You Need</h2>
             <p className="text-[#3a4a5a] max-w-lg mx-auto">
-              From instant AI analysis to full supply chain management — FreshWay covers it all.
+              From discovering top-quality seafood to managing deals and ensuring freshness — FreshWay has you covered.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -276,30 +274,41 @@ const LandingPage = () => {
         </div>
       </div>
 
-      {/* ── FRESHNESS CLASSES SECTION ─────────────────────── */}
+      {/* ── DASHBOARD PREVIEW SECTION ─────────────────────── */}
       <div className="bg-white py-20 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
             <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
-              Results
+              Roles
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-[#1a2a3a]">What You'll Get</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#1a2a3a]">Built for Everyone</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {[
-              { icon: "🟢", label: "Highly Fresh", sub: "Caught within 24–48 hrs", market: "Premium Export Market", bg: "bg-emerald-500", text: "text-emerald-700", light: "bg-emerald-50 border-emerald-100" },
-              { icon: "🔵", label: "Fresh", sub: "Suitable for local market", market: "Local Fish Market", bg: "bg-blue-500", text: "text-blue-700", light: "bg-blue-50 border-blue-100" },
-              { icon: "🔴", label: "Not Fresh", sub: "Not for consumption", market: "Discard / Non-food use", bg: "bg-red-500", text: "text-red-700", light: "bg-red-50 border-red-100" },
-            ].map((c) => (
-              <div key={c.label} className={`rounded-2xl border p-6 ${c.light} text-center`}>
-                <span className="text-4xl block mb-3">{c.icon}</span>
-                <h3 className={`font-bold text-lg mb-1 ${c.text}`}>{c.label}</h3>
-                <p className="text-xs text-[#3a4a5a] mb-4">{c.sub}</p>
-                <div className={`${c.text} text-xs font-semibold bg-white/80 rounded-xl px-3 py-2 border`}>
-                  🏪 {c.market}
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="rounded-2xl border p-8 bg-blue-50 border-blue-100 relative overflow-hidden">
+              <span className="text-5xl block mb-4">🛒</span>
+              <h3 className="font-bold text-2xl mb-2 text-blue-900">For Buyers</h3>
+              <p className="text-sm text-blue-800/80 mb-6 leading-relaxed">
+                Browse a diverse marketplace of fresh catches. Filter by fish type, view AI-verified freshness scores, chat with sellers, and leave reviews after successful purchases.
+              </p>
+              <ul className="space-y-2 text-sm text-blue-900 font-medium">
+                <li className="flex items-center gap-2"><span className="text-blue-500">✓</span> Real-time Marketplace</li>
+                <li className="flex items-center gap-2"><span className="text-blue-500">✓</span> AI Quality Proofs</li>
+                <li className="flex items-center gap-2"><span className="text-blue-500">✓</span> Integrated Chat</li>
+              </ul>
+            </div>
+            
+            <div className="rounded-2xl border p-8 bg-emerald-50 border-emerald-100 relative overflow-hidden">
+              <span className="text-5xl block mb-4">🎣</span>
+              <h3 className="font-bold text-2xl mb-2 text-emerald-900">For Sellers</h3>
+              <p className="text-sm text-emerald-800/80 mb-6 leading-relaxed">
+                Reach a wider audience of trusted buyers. Create listings with photos, use our AI tool to prove freshness, manage incoming inquiries, and build your reputation.
+              </p>
+              <ul className="space-y-2 text-sm text-emerald-900 font-medium">
+                <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Easy Listing Management</li>
+                <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Deal Tracking</li>
+                <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Rating & Feedback System</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -312,7 +321,7 @@ const LandingPage = () => {
             Ready to Start?
           </h2>
           <p className="text-white/75 text-base sm:text-lg mb-8 leading-relaxed">
-            Join the future of fish quality control. No subscription, no lab equipment — just your camera and FreshWay.
+            Join the fastest-growing seafood marketplace. Connect with buyers and sellers, ensure quality, and grow your business with FreshWay.
           </p>
           <button
             onClick={handleGetStarted}

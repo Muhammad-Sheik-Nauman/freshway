@@ -26,10 +26,10 @@ const team = [
 ];
 
 const values = [
-  { icon: "🧠", title: "AI-Driven", desc: "We use deep learning to accurately classify fish freshness, eliminating guesswork from quality control." },
-  { icon: "🌊", title: "Sustainable", desc: "By reducing fish waste through better freshness detection, we contribute to a more sustainable seafood industry." },
-  { icon: "⚡", title: "Real-Time", desc: "Instant analysis results in seconds, empowering buyers and sellers to make fast, confident decisions." },
-  { icon: "🤝", title: "Trustworthy", desc: "Built on transparency — every prediction comes with confidence scores so you always know how certain we are." },
+  { icon: "🏪", title: "Direct Marketplace", desc: "We eliminate middlemen, connecting fishermen and sellers directly with buyers for better prices and fresher fish." },
+  { icon: "🧠", title: "AI-Verified Quality", desc: "Every listing is backed by our deep learning freshness model, ensuring you know exactly what you're buying." },
+  { icon: "⭐", title: "Community Trust", desc: "A robust review and rating system guarantees accountability. Good sellers are rewarded with higher visibility." },
+  { icon: "🤝", title: "Seamless Deals", desc: "Integrated messaging and deal tracking make transactions smooth, transparent, and secure from start to finish." },
 ];
 
 export default function AboutPage() {
@@ -55,19 +55,18 @@ export default function AboutPage() {
             About FreshWay
           </span>
           <h1 className="text-4xl sm:text-5xl font-bold text-[#1a2a3a] mb-4 leading-tight">
-            Smarter Fish. <br className="sm:hidden" /> Fresher Markets.
+            Smarter Fish. <br className="sm:hidden" /> Connected Markets.
           </h1>
           <p className="text-[#3a4a5a] text-lg max-w-2xl mx-auto leading-relaxed">
-            FreshWay is an AI-powered fish freshness detection and supply chain management platform built to modernize Mangalore's seafood industry — from the boat to the buyer.
+            FreshWay is an AI-powered seafood marketplace built to modernize Mangalore's seafood industry. We connect verified sellers with buyers directly, using deep learning to guarantee freshness at every step.
           </p>
         </div>
 
-        {/* Mission Card */}
         <div className="bg-gradient-to-br from-[#1a2a3a] to-[#3a7bd5] text-white rounded-3xl p-8 sm:p-12 mb-12 shadow-2xl">
           <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-3">Our Mission</p>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Eliminating fish waste through intelligent quality control.</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Empowering a transparent and efficient seafood ecosystem.</h2>
           <p className="text-white/80 text-base leading-relaxed max-w-3xl">
-            Every year, thousands of kilograms of fish are discarded or sold below value due to a lack of reliable freshness assessment tools. FreshWay bridges this gap by putting the power of AI directly into the hands of fish market workers, supply chain managers, and quality inspectors — no laboratory required.
+            For too long, the seafood supply chain has been opaque, leading to unfair pricing and fish waste. FreshWay bridges this gap by providing a direct marketplace for buyers and sellers, powered by AI freshness detection and a trustworthy review system to ensure everyone gets a fair deal.
           </p>
         </div>
 
@@ -107,10 +106,10 @@ export default function AboutPage() {
         {/* Stats strip */}
         <div className="bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 p-6 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           {[
-            { value: "95%+", label: "Model Accuracy" },
-            { value: "3s", label: "Avg Analysis Time" },
-            { value: "3", label: "Freshness Classes" },
-            { value: "100%", label: "Open Source" },
+            { value: "500+", label: "Active Users" },
+            { value: "95%+", label: "AI Accuracy" },
+            { value: "100K+", label: "Deals Closed" },
+            { value: "4.9/5", label: "Avg Rating" },
           ].map((s) => (
             <div key={s.label}>
               <p className="text-2xl font-bold text-[#3a7bd5]">{s.value}</p>

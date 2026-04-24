@@ -4,45 +4,45 @@ import Navbar from "@/components/Navbar";
 const steps = [
   {
     number: "01",
-    title: "Capture the Fish Eye",
-    desc: "Use your phone camera or upload a photo of the fish eye directly from your device. The fish eye is the most reliable visual indicator of freshness — clear and bright means fresh; cloudy and sunken means not fresh.",
-    icon: "📷",
+    title: "Create an Account",
+    desc: "Sign up and choose your role. Buyers can browse listings and make purchases, while Sellers can post their catches and manage inventory.",
+    icon: "👤",
     color: "from-[#3a7bd5] to-[#00d2ff]",
-    tip: "Pro tip: Make sure the image is well-lit and the eye is in focus at the center of the frame.",
+    tip: "You can set up your profile with your location to see the most relevant deals near you.",
   },
   {
     number: "02",
-    title: "Image Preprocessing",
-    desc: "FreshWay's backend automatically resizes and normalizes your image to 224×224 pixels — the exact input format the AI model expects. No manual editing needed.",
-    icon: "⚙️",
+    title: "List or Browse Seafood",
+    desc: "Sellers list their catches with photos and details. Buyers can browse the real-time marketplace, filtering by fish type, price, and location.",
+    icon: "🛒",
     color: "from-purple-500 to-pink-500",
-    tip: "Images are processed and discarded immediately after analysis. Nothing is stored.",
+    tip: "Our marketplace updates in real-time, so you always see the latest catches.",
   },
   {
     number: "03",
-    title: "AI Freshness Analysis",
-    desc: "Your image is passed through FreshWay's fine-tuned MobileNetV2 deep learning model — trained on thousands of real fish eye images across three freshness categories.",
+    title: "AI Freshness Verification",
+    desc: "When listing a catch, sellers upload a photo of the fish eye. Our MobileNetV2 AI instantly analyzes it and attaches a verified freshness score to the listing.",
     icon: "🧠",
     color: "from-[#11998e] to-[#38ef7d]",
-    tip: "MobileNetV2 is optimized for speed and accuracy on mobile-scale devices.",
+    tip: "Buyers can trust the AI score to ensure they are getting exactly what they pay for.",
   },
   {
     number: "04",
-    title: "Result & Market Route",
-    desc: "You instantly receive a clarity score, a freshness label (Highly Fresh, Fresh, or Not Fresh), and a recommended market route — helping you decide where to sell or whether to discard.",
-    icon: "✅",
+    title: "Secure Deals & Leave Reviews",
+    desc: "Use our integrated chat to negotiate. Once a deal is complete, buyers can leave a star rating and review to build the seller's reputation in the community.",
+    icon: "🤝",
     color: "from-orange-400 to-red-500",
-    tip: "Confidence scores are shown per class so you can see exactly how certain the model is.",
+    tip: "Higher rated sellers get more visibility on the marketplace homepage.",
   },
 ];
 
 const techStack = [
+  { name: "Next.js 15", role: "Frontend & API Routes", icon: "⚛️" },
+  { name: "MongoDB", role: "Database & Marketplace", icon: "🍃" },
   { name: "MobileNetV2", role: "Core AI Model", icon: "🤖" },
-  { name: "TensorFlow / Keras", role: "Model Training", icon: "⚡" },
-  { name: "Flask", role: "REST API Backend", icon: "🐍" },
-  { name: "Next.js 15", role: "Frontend Framework", icon: "⚛️" },
-  { name: "Python Imaging Library", role: "Image Processing", icon: "🖼️" },
-  { name: "NumPy", role: "Numerical Operations", icon: "🔢" },
+  { name: "TensorFlow", role: "Model Inference", icon: "⚡" },
+  { name: "NextAuth", role: "Authentication", icon: "🔐" },
+  { name: "Flask", role: "AI Backend", icon: "🐍" },
 ];
 
 export default function HowItWorksPage() {
@@ -69,7 +69,7 @@ export default function HowItWorksPage() {
           </span>
           <h1 className="text-4xl sm:text-5xl font-bold text-[#1a2a3a] mb-4">How It Works</h1>
           <p className="text-[#3a4a5a] text-lg max-w-xl mx-auto">
-            From a single photo to a full freshness report — powered by deep learning, delivered in seconds.
+            From signing up to closing your first deal — see how FreshWay connects the seafood community.
           </p>
         </div>
 

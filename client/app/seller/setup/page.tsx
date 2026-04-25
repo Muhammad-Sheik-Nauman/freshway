@@ -5,10 +5,25 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 const fishOptions = [
-  "Tuna", "Mackerel", "Pomfret", "Sardine", "Squid", "Prawn",
-  "Kingfish", "Shark", "Barracuda", "Red Snapper", "Cuttlefish",
-  "Lobster", "Pearl Spot", "Tilapia", "Catfish", "Seer Fish",
-  "Anchovy", "Crab", "Mussels", "Clams",
+  "Mackerel (Bangda / Ayla)",
+  "Sardine (Mathi / Boote)",
+  "Seer Fish / King Fish (Anjal / Surmai)",
+  "Pomfret (Black/White) (Maanji / Paplet)",
+  "Tuna (Kera / Choora)",
+  "Anchovy (Bolinge / Nethili)",
+  "Lady Fish / Silver Whiting (Kane)",
+  "Catfish (Kadu / Singara)",
+  "Red Snapper (Kempu Meen / Rani Meen)",
+  "Barracuda (Sheelav / Seela)",
+  "Croaker (Ghol / Kathalai)",
+  "Ribbon Fish (Baale Meen)",
+  "Shark (small varieties) (Mori / Bondaas)",
+  "Eel (Baim / Halla Meen)",
+  "Threadfin Bream (Kilimeen / Rani)",
+  "Prawn / Shrimp (Yeti / Chemmeen)",
+  "Tiger Prawn (large) (Bagda / Tiger Yeti)",
+  "Crab (Kakke)",
+  "Blue Crab / Sea Crab (Neer Kakke)"
 ];
 
 export default function SellerSetupPage() {

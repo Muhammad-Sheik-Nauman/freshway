@@ -22,11 +22,22 @@ export async function POST(req: Request) {
     await client.connect();
     const db = client.db("freshway_db");
 
-    const review = {
+    const query = {
       buyerEmail: session.user.email,
-      buyerName: session.user.name || "Anonymous Buyer",
       sellerEmail,
-      fishName: fishName || "General",
+      fishName: fishName || "General"
+    };
+
+    const existingReview = await db.collection("reviews").findOne(query);
+
+    if (existingReview) {
+      await client.close();
+      return NextResponse.json({ error: "You have already reviewed this fish." }, { status: 400 });
+    }
+
+    const review = {
+      ...query,
+      buyerName: session.user.name || "Anonymous Buyer",
       rating: Number(rating),
       comment: comment || "",
       createdAt: new Date(),

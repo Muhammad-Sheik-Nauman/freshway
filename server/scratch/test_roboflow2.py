@@ -2,7 +2,20 @@ import requests
 import base64
 import os
 
-API_KEY = "OVjHANz3a9pZBoK1Q7lV"
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+API_KEY = os.environ.get("ROBOFLOW_API_KEY")
+if not API_KEY:
+    # Try looking in the server/.env if needed
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    API_KEY = os.environ.get("ROBOFLOW_API_KEY")
+
+if not API_KEY:
+    print("Error: ROBOFLOW_API_KEY not found in environment variables.")
+    exit(1)
 WORKSPACE = "muhammad-sheik-nauman"
 WORKFLOW_ID = "general-segmentation-api-2"
 

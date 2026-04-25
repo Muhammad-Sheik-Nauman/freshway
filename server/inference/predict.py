@@ -21,7 +21,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(os.path.dirname(BASE_DIR), "models")
 
 # --- ROBOFLOW CONFIG ---
-RF_API_KEY = "OVjHANz3a9pZBoK1Q7lV"
+RF_API_KEY = os.environ.get("ROBOFLOW_API_KEY")
+if not RF_API_KEY:
+    # Try looking in the parent directory if needed
+    load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
+    RF_API_KEY = os.environ.get("ROBOFLOW_API_KEY")
+
+if not RF_API_KEY:
+    print("Warning: ROBOFLOW_API_KEY not found in environment variables.")
 RF_WORKSPACE = "muhammad-sheik-nauman"
 RF_WORKFLOW_ID = "general-segmentation-api-2"
 RF_URL = f"https://detect.roboflow.com/infer/workflows/{RF_WORKSPACE}/{RF_WORKFLOW_ID}"

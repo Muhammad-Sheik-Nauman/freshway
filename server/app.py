@@ -1,6 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
+
 from inference.predict import predict
 
 app = Flask(__name__)
@@ -29,8 +34,11 @@ def predict_endpoint():
     image.save(image_path)
 
     try:
+        lat = float(request.form.get("lat")) if request.form.get("lat") else None
+        lng = float(request.form.get("lng")) if request.form.get("lng") else None
+        
         # Run the MobileNetV2 prediction pipeline
-        result = predict(image_path)
+        result = predict(image_path, lat, lng)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e), "status": "error"}), 500
@@ -47,4 +55,4 @@ def health_check():
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

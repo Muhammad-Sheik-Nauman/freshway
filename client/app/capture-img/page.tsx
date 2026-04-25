@@ -3,13 +3,25 @@
 import React, { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 
+interface Buyer {
+  name: string;
+  type: string;
+  distance: string;
+  price: string;
+  email?: string;
+}
+
 interface PredictionResult {
   freshness: string;
   confidence: number;
   status: string;
   message: string;
   market_route?: string;
+  ice_recommendation?: string;
+  recommended_buyers?: Buyer[];
+  buyer_suggestion?: string;
   all_scores?: Record<string, number>;
+  annotated_image?: string;
 }
 
 export default function CapturePage() {
@@ -20,6 +32,7 @@ export default function CapturePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -128,10 +141,25 @@ export default function CapturePage() {
     stopCamera();
   };
 
+  const getCoordinates = (): Promise<{ lat: number, lng: number } | null> => {
+    return new Promise((resolve) => {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null), // silent fail
+          { timeout: 5000 }
+        );
+      } else {
+        resolve(null);
+      }
+    });
+  };
+
   const analyzeFreshness = async () => {
     if (!imageFile && !selectedImage) return;
 
     setIsAnalyzing(true);
+    setGettingLocation(true);
     setResult(null);
 
     try {
@@ -146,6 +174,15 @@ export default function CapturePage() {
         formData.append("image", blob, "fish_eye.png");
       }
 
+      // Try to get GPS coordinates
+      const coords = await getCoordinates();
+      setGettingLocation(false);
+
+      if (coords) {
+        formData.append("lat", coords.lat.toString());
+        formData.append("lng", coords.lng.toString());
+      }
+
       const response = await fetch("http://localhost:5000/predict", {
         method: "POST",
         body: formData,
@@ -157,14 +194,15 @@ export default function CapturePage() {
     } catch (error) {
       console.error("Analysis failed:", error);
       setResult({
-        freshness: "Error",
+        freshness: "Invalid Image",
         confidence: 0,
         status: "error",
-        message: "Could not connect to the analysis server. Make sure the backend is running.",
+        message: "Could not connect to the analysis server. Make sure the backend (app.py) is running on port 5000.",
       });
       setShowResult(true);
     } finally {
       setIsAnalyzing(false);
+      setGettingLocation(false);
     }
   };
 
@@ -298,7 +336,7 @@ export default function CapturePage() {
                         <span className="text-3xl">{getFreshnessEmoji(result.freshness)}</span>
                         <div>
                           <p className="text-sm font-medium text-[#3a4a5a]">Freshness Result</p>
-                          <p className={`text-2xl font-bold ${getFreshnessColor(result.freshness)}`}>
+                          <p className={`text-2xl font-bold ${getFreshnessColor(result.freshness).text}`}>
                             {result.freshness}
                           </p>
                         </div>
@@ -332,8 +370,8 @@ export default function CapturePage() {
                   onClick={analyzeFreshness}
                   disabled={isAnalyzing}
                   className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${isAnalyzing
-                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                      : "bg-[#3a7bd5] text-white hover:bg-[#255bb5]"
+                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                    : "bg-[#3a7bd5] text-white hover:bg-[#255bb5]"
                     }`}
                 >
                   {isAnalyzing ? (
@@ -342,7 +380,7 @@ export default function CapturePage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Analyzing...
+                      {gettingLocation ? "Locating buyers nearby..." : "Analyzing..."}
                     </>
                   ) : (
                     <>
@@ -391,20 +429,32 @@ export default function CapturePage() {
       {showResult && result && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowResult(false)}>
           <div
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out]"
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out] flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`bg-gradient-to-r ${getFreshnessColor(result.freshness || "").bg} p-6 text-white text-center`}>
-              <span className="text-5xl block mb-2">{getFreshnessColor(result.freshness || "").icon}</span>
+            <div className={`bg-gradient-to-r ${getFreshnessColor(result.freshness || "").bg} p-6 text-white text-center shrink-0`}>
+              {result.annotated_image ? (
+                <div className="mb-4 flex justify-center">
+                  <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-xl shadow-black/20">
+                    <img 
+                      src={result.annotated_image} 
+                      className="w-full h-full object-cover" 
+                      alt="Detected Fish Eye" 
+                    />
+                  </div>
+                </div>
+              ) : (
+                <span className="text-5xl block mb-2">{getFreshnessColor(result.freshness || "").icon}</span>
+              )}
               <h2 className="text-2xl font-bold">{result.freshness}</h2>
               {result.confidence > 0 && (
-                <p className="text-white/90 text-lg mt-1">{result.confidence}% Confidence</p>
+                <p className="text-white/90 text-lg mt-1">{(result.confidence * 100).toFixed(1)}% Confidence</p>
               )}
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               <p className="text-[#3a4a5a] text-center">{result.message}</p>
 
               {/* Confidence Bars */}
@@ -428,11 +478,52 @@ export default function CapturePage() {
                 </div>
               )}
 
-              {/* Market Route */}
-              {result.market_route && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                  <p className="text-xs uppercase tracking-wider text-blue-500 font-semibold mb-1">Recommended Market</p>
-                  <p className="text-[#1a2a3a] font-bold">{result.market_route}</p>
+              {/* Ice Recommendation */}
+              {result.ice_recommendation && result.status !== "uncertain" && (
+                <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-cyan-600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
+                    <p className="text-xs uppercase tracking-wider text-cyan-600 font-semibold">Ice & Storage</p>
+                  </div>
+                  <p className="text-[#1a2a3a] text-sm font-medium">{result.ice_recommendation}</p>
+                </div>
+              )}
+
+              {/* Recommended Buyers or Suggestion */}
+              {result.status !== "error" && result.freshness !== "Invalid Image" && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-emerald-600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    <p className="text-xs uppercase tracking-wider text-emerald-600 font-semibold">Live Buyers Interested</p>
+                  </div>
+
+                  {result.recommended_buyers && result.recommended_buyers.length > 0 ? (
+                    <div className="space-y-3">
+                      {result.recommended_buyers.map((buyer, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-white rounded-lg p-3 shadow-sm border border-emerald-100">
+                          <div>
+                            <p className="font-bold text-[#1a2a3a] text-sm">{buyer.name}</p>
+                            <p className="text-xs text-[#3a4a5a]">{buyer.type} • {buyer.distance}</p>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            {buyer.email && (
+                              <button
+                                onClick={() => window.location.href = `/dashboard?chat=${encodeURIComponent(buyer.email || "")}`}
+                                className="bg-[#3a7bd5] text-white text-[10px] font-bold px-3 py-1 rounded-full hover:bg-[#255bb5] transition-colors"
+                              >
+                                Chat
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white p-3 rounded-lg shadow-sm border border-emerald-100 text-sm text-[#3a4a5a]">
+                      <p className="italic mb-1">No live buyers currently available for this freshness tier in your area.</p>
+                      <p className="font-medium text-[#1a2a3a]">{result.buyer_suggestion}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

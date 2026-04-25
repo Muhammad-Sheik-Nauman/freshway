@@ -47,6 +47,7 @@ interface FishListing {
   availableQuantity: number;
   unit: string;
   freshness: string;
+  availability: string;
   imageUrl?: string;
   isActive: boolean;
   createdAt: string;
@@ -183,7 +184,10 @@ export default function BuyerDashboard() {
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [messageImage, setMessageImage] = useState<string | null>(null);
+  const [prevMsgCount, setPrevMsgCount] = useState(0);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const convPollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -262,10 +266,37 @@ export default function BuyerDashboard() {
     };
   }, []);
 
-  // Auto-scroll chat to bottom
+  // Handle manual scroll to detect if user is at bottom
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current;
+    // If we are within 50px of the bottom, consider it "at bottom"
+    const atBottom = scrollHeight - scrollTop <= clientHeight + 50;
+    setIsAtBottom(atBottom);
+  };
+
+  // Reset counter when switching chats
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+    setPrevMsgCount(0);
+    setIsAtBottom(true); // Default to bottom for new chats
+  }, [activeChat]);
+
+  // Smart Auto-scroll chat
+  useEffect(() => {
+    const lastMessage = chatMessages[chatMessages.length - 1];
+    const isMyMessage = lastMessage?.senderEmail === session?.user?.email;
+    const hasNewMessages = chatMessages.length > prevMsgCount;
+
+    // Scroll if: 
+    // - I sent a message
+    // - New message arrived AND I'm already at bottom
+    // - First load of a chat
+    if (isMyMessage || (hasNewMessages && isAtBottom) || (chatMessages.length > 0 && prevMsgCount === 0)) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    
+    setPrevMsgCount(chatMessages.length);
+  }, [chatMessages, session?.user?.email]);
 
   const fetchSellers = async () => {
     try {
@@ -487,11 +518,19 @@ export default function BuyerDashboard() {
     if (!reviewForm.rating || !reviewForm.comment) return;
     setSubmittingReview(true);
     try {
-      await fetch("/api/reviews", {
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reviewForm),
       });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to submit review");
+        setSubmittingReview(false);
+        return;
+      }
+
       setShowReviewModal(false);
       setReviewForm({ sellerEmail: "", fishName: "", rating: 5, comment: "" });
       fetchReviews();
@@ -517,7 +556,17 @@ export default function BuyerDashboard() {
 
       let matchesAvail = true;
       if (availabilityFilter.trim() !== "") {
-        matchesAvail = (l.availability || "").toLowerCase().includes(availabilityFilter.toLowerCase());
+        const f = availabilityFilter.toLowerCase();
+        const avail = (l.availability || "").toLowerCase();
+        
+        // Smart mapping for "Tomorrow"
+        if (f === "1" || f.includes("after 1 day") || f.includes("1 day")) {
+          matchesAvail = avail.includes("tomorrow");
+        } else if (f === "0" || f.includes("today")) {
+          matchesAvail = avail.includes("today");
+        } else {
+          matchesAvail = avail.includes(f);
+        }
       }
 
       return matchesSearch && matchesAvail;
@@ -897,13 +946,35 @@ export default function BuyerDashboard() {
                       <span className="flex items-center gap-1.5 text-xs text-emerald-500 font-bold bg-emerald-50 px-2.5 py-1 rounded-full mr-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Real-time
                       </span>
+                      <button onClick={() => {
+                        const sellerData = sellers.find(s => s.email === activeChat);
+                        if (sellerData) {
+                          setSelectedSeller(sellerData);
+                        } else {
+                          setSelectedSeller({
+                            _id: "chat-deal",
+                            email: activeChat,
+                            name: conversations.find(c => c.partnerEmail === activeChat)?.partnerName || activeChat,
+                            displayName: conversations.find(c => c.partnerEmail === activeChat)?.partnerName || activeChat,
+                            businessName: conversations.find(c => c.partnerEmail === activeChat)?.partnerBusiness,
+                            fishTypes: []
+                          });
+                        }
+                        setShowDealModal(true);
+                      }} className="text-xs font-semibold px-3 py-1.5 rounded bg-[#3a7bd5] text-white hover:bg-[#255bb5] transition-colors">
+                        🤝 Make Deal
+                      </button>
                       <button onClick={() => deleteConversation(activeChat)} className="text-xs font-semibold px-2.5 py-1.5 rounded bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
                         🗑 Delete Chat
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[380px] min-h-[200px] scroll-smooth">
+                  <div 
+                    ref={chatContainerRef}
+                    onScroll={handleChatScroll}
+                    className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[380px] min-h-[200px]"
+                  >
                     {chatMessages.length === 0 ? (
                       <div className="text-center py-12 text-[#9ca3af]">
                         <p className="text-4xl mb-3">👋</p>
@@ -991,6 +1062,12 @@ export default function BuyerDashboard() {
               <div className="space-y-4">
                 {deals.map((deal) => {
                   const st = dealStatusStyle[deal.status] || dealStatusStyle.pending;
+                  const existingReview = reviews.find(r => 
+                    r.buyerEmail === session?.user?.email && 
+                    r.sellerEmail === deal.sellerEmail && 
+                    r.fishName === deal.fishType
+                  );
+
                   return (
                     <div key={deal._id} className="bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 p-6 hover:shadow-lg transition-all">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1021,12 +1098,19 @@ export default function BuyerDashboard() {
                             </button>
                           )}
                           {deal.status === "completed" && (
-                            <button onClick={() => {
-                              setReviewForm({ sellerEmail: deal.sellerEmail, fishName: deal.fishType, rating: 5, comment: "" });
-                              setShowReviewModal(true);
-                            }} className="text-xs font-bold text-white bg-gradient-to-r from-amber-400 to-orange-500 hover:opacity-90 px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1">
-                              ⭐ Leave Review
-                            </button>
+                            existingReview ? (
+                              <div className="flex flex-col items-end">
+                                <StarRating rating={existingReview.rating} />
+                                <span className="text-[10px] text-[#9ca3af] mt-0.5 font-bold uppercase tracking-tighter">Reviewed</span>
+                              </div>
+                            ) : (
+                              <button onClick={() => {
+                                setReviewForm({ sellerEmail: deal.sellerEmail, fishName: deal.fishType, rating: 5, comment: "" });
+                                setShowReviewModal(true);
+                              }} className="text-xs font-bold text-white bg-gradient-to-r from-amber-400 to-orange-500 hover:opacity-90 px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1">
+                                ⭐ Leave Review
+                              </button>
+                            )
                           )}
                         </div>
                       </div>

@@ -73,13 +73,28 @@ interface FishListing {
 }
 
 const fishOptions = [
-  "Tuna", "Mackerel", "Pomfret", "Sardine", "Squid", "Prawn",
-  "Kingfish", "Shark", "Barracuda", "Red Snapper", "Cuttlefish",
-  "Lobster", "Pearl Spot", "Tilapia", "Catfish", "Seer Fish",
-  "Anchovy", "Crab", "Mussels", "Clams",
+  "Mackerel (Bangda / Ayla)",
+  "Sardine (Mathi / Boote)",
+  "Seer Fish / King Fish (Anjal / Surmai)",
+  "Pomfret (Black/White) (Maanji / Paplet)",
+  "Tuna (Kera / Choora)",
+  "Anchovy (Bolinge / Nethili)",
+  "Lady Fish / Silver Whiting (Kane)",
+  "Catfish (Kadu / Singara)",
+  "Red Snapper (Kempu Meen / Rani Meen)",
+  "Barracuda (Sheelav / Seela)",
+  "Croaker (Ghol / Kathalai)",
+  "Ribbon Fish (Baale Meen)",
+  "Shark (small varieties) (Mori / Bondaas)",
+  "Eel (Baim / Halla Meen)",
+  "Threadfin Bream (Kilimeen / Rani)",
+  "Prawn / Shrimp (Yeti / Chemmeen)",
+  "Tiger Prawn (large) (Bagda / Tiger Yeti)",
+  "Crab (Kakke)",
+  "Blue Crab / Sea Crab (Neer Kakke)"
 ];
 
-type Tab = "tools" | "listings" | "messages" | "deals";
+type Tab = "tools" | "listings" | "messages" | "deals" | "profile";
 
 const dashboardItems = [
   {
@@ -130,13 +145,17 @@ export default function DashboardPage() {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [prevMsgCount, setPrevMsgCount] = useState(0);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const convPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fish listing state
   const [myListings, setMyListings] = useState<FishListing[]>([]);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [editingListingId, setEditingListingId] = useState<string | null>(null);
   const [postForm, setPostForm] = useState({
     fishName: "",
     description: "",
@@ -150,9 +169,20 @@ export default function DashboardPage() {
   const [posting, setPosting] = useState(false);
   const [messageImage, setMessageImage] = useState<string | null>(null);
 
+  // Profile state
+  const [profileForm, setProfileForm] = useState({
+    displayName: "",
+    phone: "",
+    location: "",
+    businessName: "",
+    businessType: "",
+    bio: "",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [showReviewsViewer, setShowReviewsViewer] = useState<{sellerEmail: string, sellerName: string} | null>(null);
+  const [showReviewsViewer, setShowReviewsViewer] = useState<{ sellerEmail: string, sellerName: string } | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
@@ -193,6 +223,14 @@ export default function DashboardPage() {
     fetchMyListings();
     fetchReviews();
 
+    const params = new URLSearchParams(window.location.search);
+    const chatEmail = params.get("chat");
+    if (chatEmail) {
+      setActiveTab("messages");
+      openChat(chatEmail);
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
     // Real-time polling for conversations every 3s
     convPollingRef.current = setInterval(() => {
       fetchConversations();
@@ -207,8 +245,40 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+    fetchProfile();
+  }, []);
+
+  // Handle manual scroll to detect if user is at bottom
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current;
+    // If we are within 50px of the bottom, consider it "at bottom"
+    const atBottom = scrollHeight - scrollTop <= clientHeight + 50;
+    setIsAtBottom(atBottom);
+  };
+
+  // Reset counter when switching chats
+  useEffect(() => {
+    setPrevMsgCount(0);
+    setIsAtBottom(true); // Default to bottom for new chats
+  }, [activeChat]);
+
+  // Smart Auto-scroll chat
+  useEffect(() => {
+    const lastMessage = chatMessages[chatMessages.length - 1];
+    const isMyMessage = lastMessage?.senderEmail === session?.user?.email;
+    const hasNewMessages = chatMessages.length > prevMsgCount;
+
+    // Scroll if: 
+    // - I sent a message
+    // - New message arrived AND I'm already at bottom
+    // - First load of a chat
+    if (isMyMessage || (hasNewMessages && isAtBottom) || (chatMessages.length > 0 && prevMsgCount === 0)) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    setPrevMsgCount(chatMessages.length);
+  }, [chatMessages, session?.user?.email]);
 
   const fetchConversations = async () => {
     try {
@@ -242,26 +312,63 @@ export default function DashboardPage() {
     if (!postForm.fishName.trim() || !postForm.pricePerKg || !postForm.imageUrl || !postForm.availability) return;
     setPosting(true);
     try {
-      await fetch("/api/fish-listings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fishName: postForm.fishName,
-          description: postForm.description,
-          imageUrl: postForm.imageUrl || null,
-          pricePerKg: Number(postForm.pricePerKg),
-          availableQuantity: Number(postForm.availableQuantity),
-          unit: postForm.unit,
-          freshness: postForm.freshness,
-          availability: postForm.availability,
-        }),
-      });
+      if (editingListingId) {
+        // UPDATE EXISTING
+        await fetch("/api/fish-listings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            listingId: editingListingId,
+            fishName: postForm.fishName,
+            description: postForm.description,
+            imageUrl: postForm.imageUrl || null,
+            pricePerKg: Number(postForm.pricePerKg),
+            availableQuantity: Number(postForm.availableQuantity),
+            unit: postForm.unit,
+            freshness: postForm.freshness,
+            availability: postForm.availability,
+          }),
+        });
+      } else {
+        // CREATE NEW
+        await fetch("/api/fish-listings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fishName: postForm.fishName,
+            description: postForm.description,
+            imageUrl: postForm.imageUrl || null,
+            pricePerKg: Number(postForm.pricePerKg),
+            availableQuantity: Number(postForm.availableQuantity),
+            unit: postForm.unit,
+            freshness: postForm.freshness,
+            availability: postForm.availability,
+          }),
+        });
+      }
+
       setShowPostModal(false);
+      setEditingListingId(null);
       setPostForm({ fishName: "", description: "", imageUrl: "", pricePerKg: "", availableQuantity: "", unit: "kg", freshness: "Fresh", availability: "" });
       fetchMyListings();
       setActiveTab("listings");
     } catch (err) { console.error(err); }
     setPosting(false);
+  };
+
+  const startEditListing = (listing: FishListing) => {
+    setEditingListingId(listing._id);
+    setPostForm({
+      fishName: listing.fishName,
+      description: listing.description || "",
+      imageUrl: listing.imageUrl || "",
+      pricePerKg: String(listing.pricePerKg),
+      availableQuantity: String(listing.availableQuantity),
+      unit: listing.unit,
+      freshness: listing.freshness,
+      availability: listing.availability,
+    });
+    setShowPostModal(true);
   };
 
   const toggleListingActive = async (listingId: string, isActive: boolean) => {
@@ -352,6 +459,55 @@ export default function DashboardPage() {
     } catch (err) { console.error(err); }
   };
 
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch("/api/user/profile");
+      if (res.ok) {
+        const data = await res.json();
+        setProfileForm({
+          displayName: data.displayName || data.name || "",
+          phone: data.phone || "",
+          location: data.location || "",
+          businessName: data.businessName || "",
+          businessType: data.businessType || "",
+          bio: data.bio || "",
+        });
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const saveProfile = async () => {
+    setProfileSaving(true);
+    try {
+      await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileForm),
+      });
+      alert("Profile updated successfully!");
+    } catch (err) { console.error(err); }
+    setProfileSaving(false);
+  };
+
+  const detectLocation = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
+          const data = await res.json();
+          const city = data.address.city || data.address.town || data.address.village || "";
+          const state = data.address.state || "";
+          setProfileForm(prev => ({ ...prev, location: city ? `${city}, ${state}` : state }));
+        } catch (err) {
+          console.error("Geocoding error:", err);
+          setProfileForm(prev => ({ ...prev, location: `${pos.coords.latitude.toFixed(2)}, ${pos.coords.longitude.toFixed(2)}` }));
+        }
+      });
+    } else {
+      alert("Geolocation is not supported by your browser.");
+    }
+  };
+
   const totalUnread = conversations.reduce((a, c) => a + c.unreadCount, 0);
   const pendingDeals = deals.filter(d => d.status === "pending").length;
 
@@ -380,37 +536,37 @@ export default function DashboardPage() {
             </h1>
           </div>
           {(() => {
-             const avgRating = reviews.length ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : "New";
-             return (
-               <button onClick={() => setShowReviewsViewer({ sellerEmail: session?.user?.email || "", sellerName: session?.user?.name || "You" })} className="flex items-center gap-3 bg-white/90 backdrop-blur px-5 py-3 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all">
-                 <div className="text-left leading-tight">
-                   <p className="text-[10px] font-bold text-[#11998e] uppercase tracking-wider">Buyer Feedback</p>
-                   <p className="text-sm font-bold text-[#1a2a3a]">Your Rating</p>
-                 </div>
-                 <span className="text-xl font-bold text-amber-500 bg-amber-50 px-3 py-1 rounded-xl border border-amber-100 flex items-center gap-1.5">
-                   ⭐ {avgRating} {avgRating !== "New" && <span className="text-xs text-amber-700 font-medium">({reviews.length})</span>}
-                 </span>
-               </button>
-             );
+            const avgRating = reviews.length ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) : "New";
+            return (
+              <button onClick={() => setShowReviewsViewer({ sellerEmail: session?.user?.email || "", sellerName: session?.user?.name || "You" })} className="flex items-center gap-3 bg-white/90 backdrop-blur px-5 py-3 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                <div className="text-left leading-tight">
+                  <p className="text-[10px] font-bold text-[#11998e] uppercase tracking-wider">Buyer Feedback</p>
+                  <p className="text-sm font-bold text-[#1a2a3a]">Your Rating</p>
+                </div>
+                <span className="text-xl font-bold text-amber-500 bg-amber-50 px-3 py-1 rounded-xl border border-amber-100 flex items-center gap-1.5">
+                  ⭐ {avgRating} {avgRating !== "New" && <span className="text-xs text-amber-700 font-medium">({reviews.length})</span>}
+                </span>
+              </button>
+            );
           })()}
         </div>
 
         {/* Tab Navigation */}
         <div className="flex gap-1 bg-white/80 backdrop-blur rounded-2xl p-1.5 shadow-sm border border-slate-200/80 mb-6 overflow-x-auto">
           {([
-            { id: "tools" as Tab, label: "My Tools", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> },
-            { id: "listings" as Tab, label: "My Fish Posts", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> },
-            { id: "messages" as Tab, label: "Messages", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> },
-            { id: "deals" as Tab, label: "Buyer Requests", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
+            { id: "tools" as Tab, label: "My Tools", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg> },
+            { id: "listings" as Tab, label: "My Fish Posts", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg> },
+            { id: "messages" as Tab, label: "Messages", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg> },
+            { id: "deals" as Tab, label: "Buyer Requests", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> },
+            { id: "profile" as Tab, label: "Profile", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg> },
           ]).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
-                activeTab === tab.id
+              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${activeTab === tab.id
                   ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white shadow-md"
                   : "text-[#3a4a5a] hover:bg-slate-100"
-              }`}
+                }`}
             >
               {tab.icon}
               {tab.label}
@@ -475,7 +631,7 @@ export default function DashboardPage() {
                 onClick={() => setShowPostModal(true)}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white font-bold text-sm shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 Post Fish for Sale
               </button>
             </div>
@@ -492,9 +648,9 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {myListings.map((listing) => (
-                  <div key={listing._id} className={`relative bg-white/90 backdrop-blur-xl rounded-2xl shadow-md border border-white/50 p-5 hover:shadow-lg transition-all ${!listing.isActive ? "opacity-60" : ""}`}>
+                  <div key={listing._id} className={`relative bg-white/90 backdrop-blur-xl rounded-2xl shadow-md border border-white/50 p-5 hover:shadow-lg transition-all flex flex-col h-full ${!listing.isActive ? "opacity-60" : ""}`}>
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#11998e] to-[#38ef7d] rounded-t-2xl" />
-                    
+
                     {/* Fish badge */}
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -510,35 +666,44 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    {/* Fish Name - HIGHLIGHTED */}
-                    <h3 className="text-xl font-extrabold text-[#1a2a3a] mb-1">
-                      <span className="bg-gradient-to-r from-[#11998e] to-[#38ef7d] bg-clip-text text-transparent">🐟 {listing.fishName}</span>
-                    </h3>
+                    {/* Fish Name - Fixed Height for Alignment */}
+                    <div className="min-h-[56px] mb-2">
+                      <h3 className="text-lg font-extrabold text-[#1a2a3a] line-clamp-2 leading-tight">
+                        <span className="bg-gradient-to-r from-[#11998e] to-[#38ef7d] bg-clip-text text-transparent">🐟 {listing.fishName}</span>
+                      </h3>
+                    </div>
+
                     {listing.imageUrl && (
-                      <div className="mb-3 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex items-center justify-center bg-slate-50 relative aspect-video h-32 w-full">
+                      <div className="mb-3 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex items-center justify-center bg-slate-50 relative aspect-video h-32 w-full shrink-0">
                         <img src={listing.imageUrl} alt={listing.fishName} className="object-cover w-full h-full" />
                       </div>
                     )}
+
                     {listing.description && <p className="text-xs text-[#3a4a5a] mb-3 line-clamp-2">{listing.description}</p>}
 
                     <div className="flex flex-wrap gap-3 text-xs text-[#3a4a5a] mb-4">
                       <span className="font-semibold">💰 ₹{listing.pricePerKg}/{listing.unit}</span>
                       {listing.availableQuantity > 0 && <span>📦 {listing.availableQuantity} {listing.unit} available</span>}
                     </div>
-                    <p className="text-[10px] text-[#9ca3af] mb-3">Posted {new Date(listing.createdAt).toLocaleDateString()}</p>
 
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-3 border-t border-slate-100">
-                      <button onClick={() => toggleListingActive(listing._id, listing.isActive)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                          listing.isActive ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                        }`}>
-                        {listing.isActive ? "⏸ Pause" : "▶ Activate"}
-                      </button>
-                      <button onClick={() => deleteListing(listing._id)}
-                        className="py-2 px-3 rounded-xl text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 transition-all">
-                        🗑
-                      </button>
+                    {/* Actions - Pushed to Bottom */}
+                    <div className="mt-auto">
+                      <p className="text-[10px] text-[#9ca3af] mb-3">Posted {new Date(listing.createdAt).toLocaleDateString()}</p>
+                      <div className="flex gap-2 pt-3 border-t border-slate-100">
+                        <button onClick={() => toggleListingActive(listing._id, listing.isActive)}
+                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${listing.isActive ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                            }`}>
+                          {listing.isActive ? "⏸ Pause" : "▶ Activate"}
+                        </button>
+                        <button onClick={() => startEditListing(listing)}
+                          className="py-2 px-3 rounded-xl text-xs font-semibold border border-blue-200 text-blue-500 hover:bg-blue-50 transition-all">
+                          ✎ Edit
+                        </button>
+                        <button onClick={() => deleteListing(listing._id)}
+                          className="py-2 px-3 rounded-xl text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-100 transition-all">
+                          🗑
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -612,7 +777,11 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="flex-1 p-4 overflow-y-auto space-y-3 max-h-[380px] min-h-[200px]">
+                  <div
+                    ref={chatContainerRef}
+                    onScroll={handleChatScroll}
+                    className="flex-1 p-4 overflow-y-auto space-y-3 max-h-[380px] min-h-[200px]"
+                  >
                     {chatMessages.length === 0 ? (
                       <div className="text-center py-12 text-[#9ca3af]"><p className="text-3xl mb-2">👋</p><p className="text-sm">Start the conversation!</p></div>
                     ) : (
@@ -620,9 +789,8 @@ export default function DashboardPage() {
                         const isMine = msg.senderEmail === session?.user?.email;
                         return (
                           <div key={msg._id || idx} className={`flex flex-col group ${isMine ? "items-end" : "items-start"}`}>
-                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm relative ${
-                              isMine ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white rounded-tr-md" : "bg-slate-100 text-[#1a2a3a] rounded-tl-md"
-                            }`}>
+                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm relative ${isMine ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white rounded-tr-md" : "bg-slate-100 text-[#1a2a3a] rounded-tl-md"
+                              }`}>
                               {msg.imageUrl && (
                                 <img src={msg.imageUrl} alt="attached" className="max-w-full rounded-xl mb-2 aspect-auto border border-white/20" />
                               )}
@@ -651,7 +819,7 @@ export default function DashboardPage() {
                   )}
                   <div className="p-4 border-t border-slate-100 flex gap-2 items-center relative">
                     <label className="cursor-pointer text-[#9ca3af] hover:text-[#11998e] transition-colors p-2 bg-slate-50 rounded-xl border border-slate-200">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
                       <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, setMessageImage)} />
                     </label>
                     <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
@@ -659,7 +827,7 @@ export default function DashboardPage() {
                       className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
                     <button onClick={sendMessage} disabled={!newMessage.trim() && !messageImage}
                       className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                     </button>
                   </div>
                 </>
@@ -698,7 +866,7 @@ export default function DashboardPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-start gap-4">
                           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#11998e] to-[#38ef7d] flex items-center justify-center text-white shadow-md shrink-0">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                           </div>
                           <div>
                             <h3 className="font-bold text-[#1a2a3a]">{deal.fishType} — {deal.quantity} {deal.unit}</h3>
@@ -745,6 +913,101 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+        {/* ══ TAB: PROFILE ══ */}
+        {activeTab === "profile" && (
+          <div className="max-w-2xl mx-auto" style={{ animation: "fadeIn 0.3s ease-out" }}>
+            <div className="bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 overflow-hidden">
+              <div className="bg-gradient-to-r from-[#11998e] to-[#38ef7d] p-8 text-white">
+                <div className="flex items-center gap-5">
+                  <div className="w-20 h-20 rounded-2xl border-3 border-white/30 overflow-hidden shadow-lg bg-white/20 flex items-center justify-center">
+                    {session?.user?.image ? (
+                      <img src={session.user.image} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-bold">{(session?.user?.name || "?")[0]}</span>
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">{profileForm.displayName || session?.user?.name}</h2>
+                    <p className="text-white/70 text-sm">{session?.user?.email}</p>
+                    <span className="inline-block mt-2 text-xs bg-white/20 px-3 py-1 rounded-full font-semibold">🏪 Seller Account</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-8 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Display Name</label>
+                    <input type="text" value={profileForm.displayName} onChange={(e) => setProfileForm(prev => ({ ...prev, displayName: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Phone</label>
+                    <input type="tel" value={profileForm.phone} onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Location</label>
+                    <div className="relative">
+                      <input type="text" value={profileForm.location} onChange={(e) => setProfileForm(prev => ({ ...prev, location: e.target.value }))}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30 pr-12" placeholder="City, State" />
+                      <button 
+                        onClick={detectLocation}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[#11998e] hover:bg-[#11998e]/10 rounded-lg transition-colors"
+                        title="Auto-detect Location"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Business Name</label>
+                    <input type="text" value={profileForm.businessName} onChange={(e) => setProfileForm(prev => ({ ...prev, businessName: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Business Type</label>
+                  <select
+                    value={profileForm.businessType}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, businessType: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] bg-white focus:outline-none focus:ring-2 focus:ring-[#11998e]/30">
+                    <option value="">Select Business Type...</option>
+                    <option value="Local Fisherman">🎣 Local Fisherman</option>
+                    <option value="Wholesaler">📦 Wholesaler</option>
+                    <option value="Retail Shop">🏪 Retail Shop</option>
+                    <option value="Exporters">🌐 Exporters</option>
+                    <option value="Cold Storage">❄️ Cold Storage</option>
+                    <option value="Home Delivery">🛵 Home Delivery</option>
+                    <option value="Fish Fertilizer & Feed">🌱 Fish Fertilizer & Feed</option>
+                    <option value="Boat & Gear Supplier">⛵ Boat & Gear Supplier</option>
+                    <option value="Aquaculture & Hatchery">🐟 Aquaculture & Hatchery</option>
+                    <option value="Processing Plant">🏭 Processing Plant</option>
+                    <option value="Other">✨ Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Business Bio</label>
+                  <textarea rows={3} value={profileForm.bio} onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30 resize-none"
+                    placeholder="Tell buyers about your catch and experience..."></textarea>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button onClick={saveProfile} disabled={profileSaving}
+                    className="flex-1 bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white font-bold py-4 rounded-xl shadow-lg hover:opacity-90 transition-all disabled:opacity-50">
+                    {profileSaving ? "Saving..." : "Save Profile Changes"}
+                  </button>
+                  <button onClick={() => window.location.reload()} className="px-6 py-4 rounded-xl border border-slate-200 font-bold text-[#3a4a5a] hover:bg-slate-50 transition-all">
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ══ POST FISH MODAL ══ */}
@@ -752,11 +1015,11 @@ export default function DashboardPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPostModal(false)}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-[#11998e] to-[#38ef7d] p-6 text-white">
-              <button onClick={() => setShowPostModal(false)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors">
+              <button onClick={() => { setShowPostModal(false); setEditingListingId(null); setPostForm({ fishName: "", description: "", imageUrl: "", pricePerKg: "", availableQuantity: "", unit: "kg", freshness: "Fresh", availability: "" }); }} className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
-              <h2 className="text-xl font-bold flex items-center gap-2">🐟 Post Fish for Sale</h2>
-              <p className="text-white/80 text-sm mt-1">This listing will be visible to all buyers in the marketplace</p>
+              <h2 className="text-xl font-bold flex items-center gap-2">🐟 {editingListingId ? "Edit Fish Listing" : "Post Fish for Sale"}</h2>
+              <p className="text-white/80 text-sm mt-1">{editingListingId ? "Update your listing details" : "This listing will be visible to all buyers in the marketplace"}</p>
             </div>
 
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -779,7 +1042,7 @@ export default function DashboardPage() {
                 <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Fish Picture *</label>
                 <div className="flex items-center gap-4">
                   <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-[#3a4a5a] hover:bg-slate-100 transition-colors">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
                     Upload Image
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, (base64) => setPostForm(prev => ({ ...prev, imageUrl: base64 })))} />
                   </label>
@@ -846,7 +1109,7 @@ export default function DashboardPage() {
         @keyframes slideUp { from { opacity: 0; transform: translateY(40px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
       `}</style>
-      
+
       {/* ══ REVIEWS VIEWER MODAL ══ */}
       {showReviewsViewer && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowReviewsViewer(null)}>
@@ -877,7 +1140,7 @@ export default function DashboardPage() {
                           <p className="text-[10px] text-[#9ca3af]">Bought: <span className="font-medium text-[#11998e]">{r.fishName}</span></p>
                         </div>
                         <div className="flex" title={`${r.rating} stars`}>
-                          {[1,2,3,4,5].map(star => (
+                          {[1, 2, 3, 4, 5].map(star => (
                             <span key={star} className={`text-xs ${star <= r.rating ? "text-amber-500" : "text-slate-200"}`}>★</span>
                           ))}
                         </div>

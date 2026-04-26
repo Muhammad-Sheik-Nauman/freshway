@@ -14,6 +14,7 @@ CORS(app)  # Enable CORS for all routes
 
 @app.route("/predict", methods=["POST"])
 def predict_endpoint():
+    print("[SERVER] Received /predict request")
     """
     Predict fish freshness from an uploaded image.
 

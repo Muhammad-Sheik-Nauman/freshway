@@ -1,7 +1,11 @@
 import requests
 import base64
 
-API_KEY = "OVjHANz3a9pZBoK1Q7lV"
+import os
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+API_KEY = os.getenv("ROBOFLOW_API_KEY")
 WORKSPACE = "muhammad-sheik-nauman"
 WORKFLOW_ID = "general-segmentation-api-2"
 IMAGE_URL = "https://media.istockphoto.com/id/1149457223/photo/fresh-fish.jpg?s=612x612&w=0&k=20&c=L_jK_Yg21r9H5B96E8tH9B6HkM3Y2lQp1n1R2N7b3Yc=" # test image

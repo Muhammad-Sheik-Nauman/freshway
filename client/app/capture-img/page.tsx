@@ -16,6 +16,7 @@ interface PredictionResult {
   confidence: number;
   status: string;
   message: string;
+  analysis_reasons?: string[];
   market_route?: string;
   ice_recommendation?: string;
   recommended_buyers?: Buyer[];
@@ -475,6 +476,21 @@ export default function CapturePage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Analysis Reasons */}
+              {result.analysis_reasons && result.analysis_reasons.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-amber-600" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <p className="text-xs uppercase tracking-wider text-amber-600 font-semibold">Visual Indicators</p>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1">
+                    {result.analysis_reasons.map((reason, idx) => (
+                      <li key={idx} className="text-[#1a2a3a] text-sm font-medium">{reason}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

@@ -610,7 +610,7 @@ export default function BuyerDashboard() {
       <div className="absolute inset-0 bg-white/78 z-0" />
       <Navbar />
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 py-8 mt-[72px]">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-8 py-6 sm:py-8 mt-[60px] sm:mt-[72px]">
         {/* Header */}
         <div className="mb-6">
           <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wider">
@@ -622,12 +622,12 @@ export default function BuyerDashboard() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 bg-white/80 backdrop-blur rounded-2xl p-1.5 shadow-sm border border-slate-200/80 mb-6 overflow-x-auto">
+        <div className="flex gap-1 bg-white/80 backdrop-blur rounded-xl sm:rounded-2xl p-1 sm:p-1.5 shadow-sm border border-slate-200/80 mb-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
+              className={`relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 whitespace-nowrap ${
                 activeTab === tab.id
                   ? "bg-gradient-to-r from-[#1a2a3a] to-[#3a7bd5] text-white shadow-md"
                   : "text-[#3a4a5a] hover:bg-slate-100"
@@ -878,7 +878,7 @@ export default function BuyerDashboard() {
         {/* TAB: MESSAGES (Real-time polling)               */}
         {/* ═══════════════════════════════════════════════ */}
         {activeTab === "messages" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[500px]" style={{ animation: "fadeIn 0.3s ease-out" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[400px] sm:min-h-[500px]" style={{ animation: "fadeIn 0.3s ease-out" }}>
             {/* Conversation List */}
             <div className="bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 overflow-hidden">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
@@ -929,7 +929,7 @@ export default function BuyerDashboard() {
             </div>
 
             {/* Chat Window */}
-            <div className="md:col-span-2 bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 flex flex-col overflow-hidden">
+            <div className="lg:col-span-2 bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 flex flex-col overflow-hidden">
               {activeChat ? (
                 <>
                   <div className="p-4 border-b border-slate-100 flex items-center justify-between">
@@ -973,7 +973,7 @@ export default function BuyerDashboard() {
                   <div 
                     ref={chatContainerRef}
                     onScroll={handleChatScroll}
-                    className="flex-1 p-4 overflow-y-auto space-y-4 max-h-[380px] min-h-[200px]"
+                    className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-4 max-h-[300px] sm:max-h-[380px] min-h-[200px]"
                   >
                     {chatMessages.length === 0 ? (
                       <div className="text-center py-12 text-[#9ca3af]">
@@ -985,7 +985,7 @@ export default function BuyerDashboard() {
                         const isMine = msg.senderEmail === session?.user?.email;
                         return (
                           <div key={msg._id || idx} className={`flex flex-col group ${isMine ? "items-end" : "items-start"}`}>
-                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm relative shadow-sm ${
+                            <div className={`max-w-[80%] sm:max-w-[70%] px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-sm relative shadow-sm ${
                               isMine ? "bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white rounded-br-sm" : "bg-white border border-slate-100 text-[#1a2a3a] rounded-bl-sm"
                             }`}>
                               {msg.imageUrl && (
@@ -1198,7 +1198,7 @@ export default function BuyerDashboard() {
       {/* ═══════════════════════════════════════════════ */}
       {showDealModal && selectedSeller && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDealModal(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative max-h-[90dvh] flex flex-col" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] p-6 text-white">
               <button onClick={() => setShowDealModal(false)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>

@@ -148,7 +148,7 @@ export default function SellerSetupPage() {
 
           <div className="space-y-4">
             {/* Name & Phone */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1">Full Name *</label>
                 <input type="text" name="displayName" value={form.displayName} onChange={handleChange} placeholder="Your name"
@@ -169,7 +169,7 @@ export default function SellerSetupPage() {
             </div>
 
             {/* Business Name & Type */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1">Business Name *</label>
                 <input type="text" name="businessName" value={form.businessName} onChange={handleChange} placeholder="Your fish business"
@@ -213,7 +213,7 @@ export default function SellerSetupPage() {
             {/* Price Range */}
             <div>
               <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1">Price Range (₹/kg)</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input type="number" value={priceRange.min} onChange={e => setPriceRange(prev => ({ ...prev, min: e.target.value }))} placeholder="Min (e.g. 200)"
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30 focus:border-[#11998e] transition-all" />
                 <input type="number" value={priceRange.max} onChange={e => setPriceRange(prev => ({ ...prev, max: e.target.value }))} placeholder="Max (e.g. 500)"

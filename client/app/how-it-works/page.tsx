@@ -54,7 +54,7 @@ export default function HowItWorksPage() {
       <div className="absolute inset-0 bg-white/78 z-0" />
       <Navbar />
 
-      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-12 mt-[60px] sm:mt-[72px]">
+      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-8 py-12 mt-[72px]">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-8 text-sm">
           <a href="/" className="text-[#3a7bd5] hover:underline font-medium">Home</a>
@@ -67,7 +67,7 @@ export default function HowItWorksPage() {
           <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-sm font-semibold px-4 py-1.5 rounded-full mb-4 uppercase tracking-wide">
             The Process
           </span>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#1a2a3a] mb-4">How It Works</h1>
+          <h1 className="text-4xl sm:text-5xl font-bold text-[#1a2a3a] mb-4">How It Works</h1>
           <p className="text-[#3a4a5a] text-lg max-w-xl mx-auto">
             From signing up to closing your first deal — see how FreshWay connects the seafood community.
           </p>
@@ -80,9 +80,9 @@ export default function HowItWorksPage() {
 
           <div className="space-y-8">
             {steps.map((step, idx) => (
-              <div key={step.number} className="flex gap-4 sm:gap-6 items-start">
+              <div key={step.number} className="flex gap-6 items-start">
                 {/* Number circle */}
-                <div className={`relative flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br ${step.color} text-white font-bold text-base sm:text-lg flex items-center justify-center shadow-lg z-10`}>
+                <div className={`relative flex-shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} text-white font-bold text-lg flex items-center justify-center shadow-lg z-10`}>
                   {step.icon}
                   <span className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${step.color} text-white text-xs font-bold flex items-center justify-center shadow border-2 border-white`}>
                     {idx + 1}
@@ -90,13 +90,13 @@ export default function HowItWorksPage() {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 bg-white/90 backdrop-blur rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-md border border-white/50">
+                <div className="flex-1 bg-white/90 backdrop-blur rounded-2xl p-6 shadow-md border border-white/50">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs font-bold text-[#9ca3af] tracking-widest">{step.number}</span>
                     <h2 className="text-lg font-bold text-[#1a2a3a]">{step.title}</h2>
                   </div>
                   <p className="text-sm text-[#3a4a5a] leading-relaxed mb-3">{step.desc}</p>
-                  <div className="flex items-start gap-2 bg-blue-50 rounded-lg sm:rounded-xl p-2.5 sm:p-3">
+                  <div className="flex items-start gap-2 bg-blue-50 rounded-xl p-3">
                     <span className="text-base">💡</span>
                     <p className="text-xs text-[#3a7bd5] font-medium leading-relaxed">{step.tip}</p>
                   </div>
@@ -127,13 +127,13 @@ export default function HowItWorksPage() {
         {/* Tech Stack */}
         <div>
           <h2 className="text-2xl font-bold text-[#1a2a3a] mb-6 text-center">Technology Stack</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {techStack.map((tech) => (
-              <div key={tech.name} className="bg-white/90 backdrop-blur rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-md border border-white/50 flex items-center gap-2 sm:gap-3">
-                <span className="text-xl sm:text-2xl">{tech.icon}</span>
+              <div key={tech.name} className="bg-white/90 backdrop-blur rounded-2xl p-5 shadow-md border border-white/50 flex items-center gap-3">
+                <span className="text-2xl">{tech.icon}</span>
                 <div>
-                  <p className="font-bold text-[#1a2a3a] text-xs sm:text-sm">{tech.name}</p>
-                  <p className="text-[10px] sm:text-xs text-[#3a4a5a]">{tech.role}</p>
+                  <p className="font-bold text-[#1a2a3a] text-sm">{tech.name}</p>
+                  <p className="text-xs text-[#3a4a5a]">{tech.role}</p>
                 </div>
               </div>
             ))}

@@ -524,7 +524,7 @@ export default function DashboardPage() {
       <div className="absolute top-0 left-0 w-full h-full bg-white/75 z-0" />
       <Navbar />
 
-      <div className="relative z-10 w-full max-w-6xl px-3 sm:px-4 md:px-8 py-6 sm:py-10 mt-[60px] sm:mt-[72px]">
+      <div className="relative z-10 w-full max-w-6xl px-4 sm:px-8 py-10 mt-[72px]">
         {/* Header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -552,7 +552,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 bg-white/80 backdrop-blur rounded-xl sm:rounded-2xl p-1 sm:p-1.5 shadow-sm border border-slate-200/80 mb-6 overflow-x-auto">
+        <div className="flex gap-1 bg-white/80 backdrop-blur rounded-2xl p-1.5 shadow-sm border border-slate-200/80 mb-6 overflow-x-auto">
           {([
             { id: "tools" as Tab, label: "My Tools", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg> },
             { id: "listings" as Tab, label: "My Fish Posts", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg> },
@@ -563,7 +563,7 @@ export default function DashboardPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 whitespace-nowrap ${activeTab === tab.id
+              className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap ${activeTab === tab.id
                   ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white shadow-md"
                   : "text-[#3a4a5a] hover:bg-slate-100"
                 }`}
@@ -714,7 +714,7 @@ export default function DashboardPage() {
 
         {/* ══ TAB: MESSAGES ══ */}
         {activeTab === "messages" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[400px] sm:min-h-[500px]" style={{ animation: "fadeIn 0.3s ease-out" }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[500px]" style={{ animation: "fadeIn 0.3s ease-out" }}>
             <div className="bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 overflow-hidden">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="font-bold text-[#1a2a3a] text-sm">Buyer Messages</h3>
@@ -754,7 +754,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="lg:col-span-2 bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 flex flex-col overflow-hidden">
+            <div className="md:col-span-2 bg-white/90 backdrop-blur rounded-2xl shadow-md border border-white/50 flex flex-col overflow-hidden">
               {activeChat ? (
                 <>
                   <div className="p-4 border-b border-slate-100 flex items-center justify-between">
@@ -780,7 +780,7 @@ export default function DashboardPage() {
                   <div
                     ref={chatContainerRef}
                     onScroll={handleChatScroll}
-                    className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 max-h-[300px] sm:max-h-[380px] min-h-[200px]"
+                    className="flex-1 p-4 overflow-y-auto space-y-3 max-h-[380px] min-h-[200px]"
                   >
                     {chatMessages.length === 0 ? (
                       <div className="text-center py-12 text-[#9ca3af]"><p className="text-3xl mb-2">👋</p><p className="text-sm">Start the conversation!</p></div>
@@ -789,7 +789,7 @@ export default function DashboardPage() {
                         const isMine = msg.senderEmail === session?.user?.email;
                         return (
                           <div key={msg._id || idx} className={`flex flex-col group ${isMine ? "items-end" : "items-start"}`}>
-                            <div className={`max-w-[80%] sm:max-w-[70%] px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl text-sm relative ${isMine ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white rounded-tr-md" : "bg-slate-100 text-[#1a2a3a] rounded-tl-md"
+                            <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm relative ${isMine ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white rounded-tr-md" : "bg-slate-100 text-[#1a2a3a] rounded-tl-md"
                               }`}>
                               {msg.imageUrl && (
                                 <img src={msg.imageUrl} alt="attached" className="max-w-full rounded-xl mb-2 aspect-auto border border-white/20" />
@@ -1013,7 +1013,7 @@ export default function DashboardPage() {
       {/* ══ POST FISH MODAL ══ */}
       {showPostModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPostModal(false)}>
-          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative" style={{ animation: "slideUp 0.3s ease-out" }} onClick={(e) => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-[#11998e] to-[#38ef7d] p-6 text-white">
               <button onClick={() => { setShowPostModal(false); setEditingListingId(null); setPostForm({ fishName: "", description: "", imageUrl: "", pricePerKg: "", availableQuantity: "", unit: "kg", freshness: "Fresh", availability: "" }); }} className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>

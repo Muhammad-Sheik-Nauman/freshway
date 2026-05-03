@@ -242,18 +242,18 @@ export default function CapturePage() {
 
       <Navbar />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-4 relative z-10 w-full max-w-2xl mt-[60px] sm:mt-[72px]">
-        <div className="w-full bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl p-4 sm:p-6 md:p-10 border border-white/20">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 relative z-10 w-full max-w-2xl mt-[72px]">
+        <div className="w-full bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-10 border border-white/20">
           <div className="text-center mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#1a2a3a] mb-2">Capture Quality</h1>
+            <h1 className="text-3xl font-bold text-[#1a2a3a] mb-2">Capture Quality</h1>
             <p className="text-[#3a4a5a]">Upload or take a photo of the fish eye for freshness analysis</p>
           </div>
 
           {!selectedImage && !isCameraOpen ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <button
                 onClick={startCamera}
-                className="flex flex-col items-center justify-center p-6 sm:p-8 bg-gradient-to-br from-[#3a7bd5] to-[#00d2ff] rounded-xl text-white hover:scale-105 transition-transform cursor-pointer shadow-lg group"
+                className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-[#3a7bd5] to-[#00d2ff] rounded-xl text-white hover:scale-105 transition-transform cursor-pointer shadow-lg group"
               >
                 <div className="bg-white/20 p-4 rounded-full mb-4 group-hover:bg-white/30 transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
@@ -264,7 +264,7 @@ export default function CapturePage() {
 
               <button
                 onClick={triggerUpload}
-                className="flex flex-col items-center justify-center p-6 sm:p-8 bg-white border-2 border-dashed border-[#3a7bd5] rounded-xl text-[#3a7bd5] hover:bg-[#f0f7ff] transition-colors cursor-pointer group"
+                className="flex flex-col items-center justify-center p-8 bg-white border-2 border-dashed border-[#3a7bd5] rounded-xl text-[#3a7bd5] hover:bg-[#f0f7ff] transition-colors cursor-pointer group"
               >
                 <div className="bg-[#f0f7ff] p-4 rounded-full mb-4 group-hover:bg-[#e0efff] transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
@@ -409,18 +409,18 @@ export default function CapturePage() {
           />
         </div>
 
-        <div className="mt-6 sm:mt-8 grid grid-cols-3 gap-2 sm:gap-4 w-full">
-          <div className="bg-white/60 backdrop-blur-sm p-3 sm:p-4 rounded-xl text-center">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-xl text-center">
             <span className="block text-2xl mb-1">💡</span>
-            <p className="text-[10px] sm:text-xs text-[#3a4a5a] font-medium">Good lighting is essential</p>
+            <p className="text-xs text-[#3a4a5a] font-medium">Good lighting is essential</p>
           </div>
-          <div className="bg-white/60 backdrop-blur-sm p-3 sm:p-4 rounded-xl text-center">
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-xl text-center">
             <span className="block text-2xl mb-1">🎯</span>
-            <p className="text-[10px] sm:text-xs text-[#3a4a5a] font-medium">Focus on the eye directly</p>
+            <p className="text-xs text-[#3a4a5a] font-medium">Focus on the eye directly</p>
           </div>
-          <div className="bg-white/60 backdrop-blur-sm p-3 sm:p-4 rounded-xl text-center">
+          <div className="bg-white/60 backdrop-blur-sm p-4 rounded-xl text-center">
             <span className="block text-2xl mb-1">📸</span>
-            <p className="text-[10px] sm:text-xs text-[#3a4a5a] font-medium">Keep the image steady</p>
+            <p className="text-xs text-[#3a4a5a] font-medium">Keep the image steady</p>
           </div>
         </div>
       </div>
@@ -429,7 +429,7 @@ export default function CapturePage() {
       {showResult && result && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowResult(false)}>
           <div
-            className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out] flex flex-col max-h-[85dvh] sm:max-h-[90vh]"
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out] flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

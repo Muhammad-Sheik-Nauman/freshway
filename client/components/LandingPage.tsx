@@ -104,35 +104,35 @@ const LandingPage = () => {
 
       {/* ── HERO SECTION ─────────────────────────────────── */}
       <div
-        className="relative min-h-screen flex flex-col pt-[60px] sm:pt-[72px]"
+        className="relative min-h-screen flex flex-col pt-[72px]"
         style={{ backgroundImage: "url('/bg.png')", backgroundSize: "cover", backgroundPosition: "center" }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/70 to-white/90 z-0" />
         <Navbar />
 
-        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 py-10 sm:py-20">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 py-20">
           <div className="flex items-center gap-2 bg-[#3a7bd5]/10 border border-[#3a7bd5]/20 text-[#3a7bd5] text-xs sm:text-sm font-semibold px-4 py-2 rounded-full mb-6 backdrop-blur-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
             The Premier AI-Powered Seafood Marketplace
           </div>
 
           {/* Headline */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#1a2a3a] mb-4 leading-tight max-w-3xl">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[#1a2a3a] mb-4 leading-tight max-w-3xl">
             Buy & Sell Seafood with
             <span className="block bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] bg-clip-text text-transparent">
               AI Freshness & Total Confidence
             </span>
           </h1>
 
-          <p className="text-[#3a4a5a] text-sm sm:text-base md:text-lg lg:text-xl max-w-2xl mx-auto mb-6 sm:mb-10 leading-relaxed px-2">
+          <p className="text-[#3a4a5a] text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
             FreshWay connects buyers and sellers in a transparent marketplace. We use AI to instantly verify fish freshness, ensuring you get the highest quality seafood every time.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-8 sm:mb-14 w-full max-w-md sm:max-w-none px-2">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-14">
             <button
               onClick={handleGetStarted}
-              className="group flex items-center justify-center gap-2 bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white font-bold px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl shadow-lg hover:shadow-[#3a7bd5]/40 hover:scale-105 transition-all text-sm sm:text-base"
+              className="group flex items-center justify-center gap-2 bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] text-white font-bold px-8 py-4 rounded-xl shadow-lg hover:shadow-[#3a7bd5]/40 hover:scale-105 transition-all text-base"
             >
               Get Started Free
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform">
@@ -141,7 +141,7 @@ const LandingPage = () => {
             </button>
             <Link
               href="/how-it-works"
-              className="flex items-center justify-center gap-2 bg-white/90 text-[#1a2a3a] font-semibold px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl border border-slate-200 shadow-sm hover:bg-white hover:border-[#3a7bd5] transition-all text-sm sm:text-base"
+              className="flex items-center justify-center gap-2 bg-white/90 text-[#1a2a3a] font-semibold px-8 py-4 rounded-xl border border-slate-200 shadow-sm hover:bg-white hover:border-[#3a7bd5] transition-all text-base"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
@@ -151,7 +151,7 @@ const LandingPage = () => {
           </div>
 
           {/* Floating demo card */}
-          <div className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/60 p-4 sm:p-5 text-left">
+          <div className="w-full max-w-sm mx-auto bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/60 p-5 text-left">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#3a7bd5] to-[#00d2ff] flex items-center justify-center shadow">
                 <span className="text-lg">🐟</span>
@@ -200,8 +200,8 @@ const LandingPage = () => {
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-[#1a2a3a] to-[#3a7bd5] py-10 sm:py-14 px-4">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8">
+      <div className="bg-gradient-to-r from-[#1a2a3a] to-[#3a7bd5] py-14 px-4">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8">
           <StatItem value={500} suffix="+" label="Active Buyers & Sellers" />
           <StatItem value={95} suffix="%" label="AI Accuracy" />
           <StatItem value={100} suffix="K+" label="Deals Closed" />
@@ -210,13 +210,13 @@ const LandingPage = () => {
       </div>
 
       {/* ── FEATURES SECTION ──────────────────────────────── */}
-      <div className="bg-white py-12 sm:py-20 px-4">
+      <div className="bg-white py-20 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
               Features
             </span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1a2a3a] mb-3">Everything You Need</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#1a2a3a] mb-3">Everything You Need</h2>
             <p className="text-[#3a4a5a] max-w-lg mx-auto">
               From discovering top-quality seafood to managing deals and ensuring freshness — FreshWay has you covered.
             </p>
@@ -237,7 +237,7 @@ const LandingPage = () => {
 
       {/* ── HOW IT WORKS SECTION ──────────────────────────── */}
       <div
-        className="relative py-12 sm:py-20 px-4"
+        className="relative py-20 px-4"
         style={{ backgroundImage: "url('/bg.png')", backgroundSize: "cover", backgroundPosition: "center" }}
       >
         <div className="absolute inset-0 bg-white/88" />
@@ -275,7 +275,7 @@ const LandingPage = () => {
       </div>
 
       {/* ── DASHBOARD PREVIEW SECTION ─────────────────────── */}
-      <div className="bg-white py-12 sm:py-20 px-4">
+      <div className="bg-white py-20 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
             <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-xs font-bold px-4 py-1.5 rounded-full mb-3 uppercase tracking-wider">
@@ -285,7 +285,7 @@ const LandingPage = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="rounded-2xl border p-8 bg-blue-50 border-blue-100 relative overflow-hidden">
-              <span className="text-4xl sm:text-5xl block mb-3 sm:mb-4">🛒</span>
+              <span className="text-5xl block mb-4">🛒</span>
               <h3 className="font-bold text-2xl mb-2 text-blue-900">For Buyers</h3>
               <p className="text-sm text-blue-800/80 mb-6 leading-relaxed">
                 Browse a diverse marketplace of fresh catches. Filter by fish type, view AI-verified freshness scores, chat with sellers, and leave reviews after successful purchases.
@@ -298,7 +298,7 @@ const LandingPage = () => {
             </div>
             
             <div className="rounded-2xl border p-8 bg-emerald-50 border-emerald-100 relative overflow-hidden">
-              <span className="text-4xl sm:text-5xl block mb-3 sm:mb-4">🎣</span>
+              <span className="text-5xl block mb-4">🎣</span>
               <h3 className="font-bold text-2xl mb-2 text-emerald-900">For Sellers</h3>
               <p className="text-sm text-emerald-800/80 mb-6 leading-relaxed">
                 Reach a wider audience of trusted buyers. Create listings with photos, use our AI tool to prove freshness, manage incoming inquiries, and build your reputation.
@@ -314,10 +314,10 @@ const LandingPage = () => {
       </div>
 
       {/* ── CTA SECTION ───────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#1a2a3a] to-[#3a7bd5] py-12 sm:py-20 px-4 text-center">
+      <div className="bg-gradient-to-br from-[#1a2a3a] to-[#3a7bd5] py-20 px-4 text-center">
         <div className="max-w-2xl mx-auto">
           <span className="text-5xl block mb-6">🐠</span>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
             Ready to Start?
           </h2>
           <p className="text-white/75 text-base sm:text-lg mb-8 leading-relaxed">
@@ -336,13 +336,13 @@ const LandingPage = () => {
       </div>
 
       {/* ── FOOTER ────────────────────────────────────────── */}
-      <footer className="bg-[#0d1b2a] text-white/60 py-6 sm:py-8 px-4">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-xs sm:text-sm">
+      <footer className="bg-[#0d1b2a] text-white/60 py-8 px-4">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="FreshWay" className="h-8 opacity-80" />
             <span className="font-semibold text-white/80">FreshWay</span>
           </div>
-          <div className="flex gap-4 sm:gap-6">
+          <div className="flex gap-6">
             <Link href="/about" className="hover:text-white transition-colors">About</Link>
             <Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link>
             <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>

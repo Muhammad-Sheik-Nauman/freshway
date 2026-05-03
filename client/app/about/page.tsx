@@ -41,7 +41,7 @@ export default function AboutPage() {
       <div className="absolute inset-0 bg-white/78 z-0" />
       <Navbar />
 
-      <div className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-8 py-8 sm:py-12 mt-[60px] sm:mt-[72px]">
+      <div className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-8 py-12 mt-[72px]">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-8 text-sm">
           <a href="/" className="text-[#3a7bd5] hover:underline font-medium">Home</a>
@@ -54,7 +54,7 @@ export default function AboutPage() {
           <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-sm font-semibold px-4 py-1.5 rounded-full mb-4 uppercase tracking-wide">
             About FreshWay
           </span>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#1a2a3a] mb-4 leading-tight">
+          <h1 className="text-4xl sm:text-5xl font-bold text-[#1a2a3a] mb-4 leading-tight">
             Smarter Fish. <br className="sm:hidden" /> Connected Markets.
           </h1>
           <p className="text-[#3a4a5a] text-lg max-w-2xl mx-auto leading-relaxed">
@@ -62,9 +62,9 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-[#1a2a3a] to-[#3a7bd5] text-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 mb-12 shadow-2xl">
+        <div className="bg-gradient-to-br from-[#1a2a3a] to-[#3a7bd5] text-white rounded-3xl p-8 sm:p-12 mb-12 shadow-2xl">
           <p className="text-xs font-bold uppercase tracking-widest text-white/60 mb-3">Our Mission</p>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4">Empowering a transparent and efficient seafood ecosystem.</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Empowering a transparent and efficient seafood ecosystem.</h2>
           <p className="text-white/80 text-base leading-relaxed max-w-3xl">
             For too long, the seafood supply chain has been opaque, leading to unfair pricing and fish waste. FreshWay bridges this gap by providing a direct marketplace for buyers and sellers, powered by AI freshness detection and a trustworthy review system to ensure everyone gets a fair deal.
           </p>

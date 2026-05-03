@@ -72,7 +72,7 @@ export default function SupplyChainPage() {
       <div className="absolute inset-0 bg-white/78 z-0" />
       <Navbar />
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-10 mt-[60px] sm:mt-[72px]">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 py-10 mt-[72px]">
         {/* ── Page Header ─────────────────────────── */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
@@ -80,7 +80,7 @@ export default function SupplyChainPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
             <span className="text-sm text-[#9ca3af] font-medium">Market Network</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1a2a3a] mb-2">Buyer Network</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#1a2a3a] mb-2">Buyer Network</h1>
           <p className="text-[#3a4a5a] text-base">Browse and connect with registered buyers in the market.</p>
         </div>
 

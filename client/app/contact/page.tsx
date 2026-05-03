@@ -25,7 +25,7 @@ export default function ContactPage() {
       <div className="absolute inset-0 bg-white/78 z-0" />
       <Navbar />
 
-      <div className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-8 py-8 sm:py-12 mt-[60px] sm:mt-[72px]">
+      <div className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-8 py-12 mt-[72px]">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-8 text-sm">
           <a href="/" className="text-[#3a7bd5] hover:underline font-medium">Home</a>
@@ -38,7 +38,7 @@ export default function ContactPage() {
           <span className="inline-block bg-[#3a7bd5]/10 text-[#3a7bd5] text-sm font-semibold px-4 py-1.5 rounded-full mb-4 uppercase tracking-wide">
             Get In Touch
           </span>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#1a2a3a] mb-3">Contact Us</h1>
+          <h1 className="text-4xl sm:text-5xl font-bold text-[#1a2a3a] mb-3">Contact Us</h1>
           <p className="text-[#3a4a5a] text-lg max-w-xl mx-auto">
             Have questions, feedback, or want to partner with FreshWay? We'd love to hear from you.
           </p>
@@ -89,7 +89,7 @@ export default function ContactPage() {
           </div>
 
           {/* ── Contact Form Column ── */}
-          <div className="lg:col-span-3 bg-white/90 backdrop-blur rounded-2xl sm:rounded-3xl shadow-xl border border-white/50 p-5 sm:p-8">
+          <div className="lg:col-span-3 bg-white/90 backdrop-blur rounded-3xl shadow-xl border border-white/50 p-8">
             {submitted ? (
               <div className="h-full flex flex-col items-center justify-center text-center py-12">
                 <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-4xl mb-5 shadow-inner">

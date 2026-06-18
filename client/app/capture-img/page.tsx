@@ -2,6 +2,30 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
+const fishOptions = [
+  "Mackerel (Bangda / Ayla)",
+  "Sardine (Mathi / Boote)",
+  "Seer Fish / King Fish (Anjal / Surmai)",
+  "Pomfret (Black/White) (Maanji / Paplet)",
+  "Tuna (Kera / Choora)",
+  "Anchovy (Bolinge / Nethili)",
+  "Lady Fish / Silver Whiting (Kane)",
+  "Catfish (Kadu / Singara)",
+  "Red Snapper (Kempu Meen / Rani Meen)",
+  "Barracuda (Sheelav / Seela)",
+  "Croaker (Ghol / Kathalai)",
+  "Ribbon Fish (Baale Meen)",
+  "Shark (small varieties) (Mori / Bondaas)",
+  "Eel (Baim / Halla Meen)",
+  "Threadfin Bream (Kilimeen / Rani)",
+  "Prawn / Shrimp (Yeti / Chemmeen)",
+  "Tiger Prawn (large) (Bagda / Tiger Yeti)",
+  "Crab (Kakke)",
+  "Blue Crab / Sea Crab (Neer Kakke)"
+];
 
 interface Buyer {
   name: string;
@@ -25,6 +49,9 @@ interface PredictionResult {
 }
 
 export default function CapturePage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [cropPos, setCropPos] = useState<{ x: number, y: number } | null>(null);
@@ -34,6 +61,18 @@ export default function CapturePage() {
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+
+  // Post fish listing states
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [sendingChatTo, setSendingChatTo] = useState<string | null>(null);
+  const [postForm, setPostForm] = useState({
+    fishName: "",
+    description: "",
+    pricePerKg: "",
+    availableQuantity: "",
+    availability: "Available Today",
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -250,6 +289,85 @@ export default function CapturePage() {
     }
   };
 
+  const mapAIFreshness = (aiFreshness: string): string => {
+    if (aiFreshness === "Highly Fresh" || aiFreshness === "Fresh") {
+      return "Fresh";
+    }
+    if (aiFreshness === "Not Fresh") {
+      return "Day-old";
+    }
+    return "Fresh";
+  };
+
+  const postFishListing = async () => {
+    if (!postForm.fishName.trim() || !postForm.pricePerKg || !selectedImage || !postForm.availability || !result) return;
+    setPosting(true);
+    try {
+      const response = await fetch("/api/fish-listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fishName: postForm.fishName,
+          description: postForm.description,
+          imageUrl: selectedImage,
+          pricePerKg: Number(postForm.pricePerKg),
+          availableQuantity: Number(postForm.availableQuantity || 0),
+          unit: "kg",
+          freshness: result.freshness,
+          availability: postForm.availability,
+          freshnessAssurance: {
+            verified: true,
+            aiLabel: result.freshness,
+            confidence: result.confidence,
+            allScores: result.all_scores || null,
+            evaluatedAt: new Date().toISOString(),
+          }
+        }),
+      });
+
+      if (response.ok) {
+        alert("Success! Fish listing posted with Freshway Assurance.");
+        setShowPostModal(false);
+        router.push("/dashboard");
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to post: ${errorData.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error posting listing:", err);
+      alert("Error occurred while posting listing.");
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleChatClick = async (buyerEmail: string) => {
+    if (!result) return;
+    setSendingChatTo(buyerEmail);
+
+    const content = `🛡️ AI Quality Verification Result:\n` +
+      `• Freshness: ${result.freshness}\n` +
+      `• Confidence: ${(result.confidence * 100).toFixed(1)}%\n` +
+      `• Verification details: ${result.message}`;
+
+    try {
+      await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientEmail: buyerEmail,
+          content,
+          imageUrl: selectedImage || null,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to auto-send freshness results to chat:", err);
+    } finally {
+      window.location.href = `/dashboard?chat=${encodeURIComponent(buyerEmail)}`;
+      setSendingChatTo(null);
+    }
+  };
+
   const getFreshnessColor = (freshness: string) => {
     switch (freshness) {
       case "Highly Fresh": return { bg: "from-emerald-500 to-green-400", text: "text-emerald-700", icon: "🟢" };
@@ -431,6 +549,15 @@ export default function CapturePage() {
                           {result.message}
                         </p>
                       )}
+                      {result.status !== "error" && session?.user && (session.user as any).role === "seller" && (
+                        <button
+                          onClick={() => setShowPostModal(true)}
+                          className="mt-4 w-full py-3 bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white rounded-xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                          🛡️ Post Evaluated Fish
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -584,10 +711,25 @@ export default function CapturePage() {
                           <div className="flex gap-2 items-center">
                             {buyer.email && (
                               <button
-                                onClick={() => window.location.href = `/dashboard?chat=${encodeURIComponent(buyer.email || "")}`}
-                                className="bg-[#3a7bd5] text-white text-[10px] font-bold px-3 py-1 rounded-full hover:bg-[#255bb5] transition-colors"
+                                onClick={() => handleChatClick(buyer.email!)}
+                                disabled={sendingChatTo !== null}
+                                className={`text-white text-[10px] font-bold px-3 py-1 rounded-full transition-colors flex items-center gap-1.5 ${
+                                  sendingChatTo === buyer.email
+                                    ? "bg-slate-400 cursor-not-allowed"
+                                    : "bg-[#3a7bd5] hover:bg-[#255bb5] cursor-pointer"
+                                }`}
                               >
-                                Chat
+                                {sendingChatTo === buyer.email ? (
+                                  <>
+                                    <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Sending...
+                                  </>
+                                ) : (
+                                  "Chat"
+                                )}
                               </button>
                             )}
                           </div>
@@ -603,12 +745,115 @@ export default function CapturePage() {
                 </div>
               )}
 
+              {/* Post Evaluated Fish Button (Visible only to Sellers) */}
+              {result.status !== "error" && session?.user && (session.user as any).role === "seller" && (
+                <button
+                  onClick={() => {
+                    setShowResult(false);
+                    setShowPostModal(true);
+                  }}
+                  className="w-full py-3 bg-gradient-to-r from-[#11998e] to-[#38ef7d] text-white rounded-xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg mb-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  🛡️ Post to Marketplace
+                </button>
+              )}
+
               {/* Close Button */}
               <button
                 onClick={() => setShowResult(false)}
                 className="w-full py-3 bg-[#1a2a3a] text-white rounded-xl font-bold hover:bg-[#0d1b2a] transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ POST EVALUATED FISH MODAL ══ */}
+      {showPostModal && result && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPostModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative animate-[slideUp_0.3s_ease-out]" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-[#11998e] to-[#38ef7d] p-6 text-white">
+              <button onClick={() => setShowPostModal(false)} className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+              <h2 className="text-xl font-bold flex items-center gap-2">🛡️ Post Fish with Freshway Assurance</h2>
+              <p className="text-white/80 text-sm mt-1">This listing will have a verified freshness trust badge in the marketplace</p>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Fish Name *</label>
+                <input type="text" list="fishNameOptions" value={postForm.fishName} onChange={(e) => setPostForm(prev => ({ ...prev, fishName: e.target.value }))}
+                  placeholder="Select or type custom fish name..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] bg-white focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                <datalist id="fishNameOptions">
+                  {fishOptions.map((f) => (<option key={f} value={f} />))}
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Description</label>
+                <textarea value={postForm.description} onChange={(e) => setPostForm(prev => ({ ...prev, description: e.target.value }))} rows={2}
+                  placeholder="E.g. Freshly caught this morning, stored on ice..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30 resize-none" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Price/kg (₹) *</label>
+                  <input type="number" value={postForm.pricePerKg} onChange={(e) => setPostForm(prev => ({ ...prev, pricePerKg: e.target.value }))} placeholder="300"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Available Qty (kg)</label>
+                  <input type="number" value={postForm.availableQuantity} onChange={(e) => setPostForm(prev => ({ ...prev, availableQuantity: e.target.value }))} placeholder="100"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Freshness Status (Locked)</label>
+                  <div className="w-full px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-emerald-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    AI: {result.freshness} ({(result.confidence * 100).toFixed(1)}%)
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Availability Timeline *</label>
+                  <input type="text" list="availabilityOptions" value={postForm.availability} onChange={(e) => setPostForm(prev => ({ ...prev, availability: e.target.value }))}
+                    placeholder="Select or type custom..."
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-[#1a2a3a] bg-white focus:outline-none focus:ring-2 focus:ring-[#11998e]/30" />
+                  <datalist id="availabilityOptions">
+                    <option value="Available Today" />
+                    <option value="Available Tomorrow" />
+                    <option value="In 2 Days" />
+                    <option value="In 3+ Days" />
+                  </datalist>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#3a4a5a] uppercase tracking-wider mb-1.5">Listing Picture</label>
+                {selectedImage && (
+                  <div className="relative w-28 h-20 rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50">
+                    <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-1 right-1 bg-emerald-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                      Verified
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => setShowPostModal(false)} className="flex-1 py-3 rounded-xl font-bold text-[#1a2a3a] border border-slate-200 hover:bg-slate-50 transition-all text-sm">Cancel</button>
+              <button onClick={postFishListing} disabled={!postForm.fishName || !postForm.pricePerKg || !postForm.availability || posting}
+                className={`flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all ${(postForm.fishName && postForm.pricePerKg && postForm.availability) ? "bg-gradient-to-r from-[#11998e] to-[#38ef7d] hover:opacity-90 shadow-lg" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}>
+                {posting ? "Posting..." : "🐟 Post Fish Listing"}
               </button>
             </div>
           </div>

@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       freshness: body.freshness || "Fresh",
       availability: body.availability || "Available Today",
       isActive: true,
+      freshnessAssurance: body.freshnessAssurance || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

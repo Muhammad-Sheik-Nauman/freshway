@@ -51,6 +51,13 @@ interface FishListing {
   imageUrl?: string;
   isActive: boolean;
   createdAt: string;
+  freshnessAssurance?: {
+    verified: boolean;
+    aiLabel: string;
+    confidence: number;
+    allScores?: Record<string, number>;
+    evaluatedAt?: string;
+  };
 }
 
 interface Conversation {
@@ -739,9 +746,12 @@ export default function BuyerDashboard() {
 
                     // Freshness badge color
                     const freshnessStyle: Record<string, { bg: string; dot: string }> = {
+                      "Highly Fresh": { bg: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
                       "Fresh": { bg: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
                       "Day-old": { bg: "bg-amber-100 text-amber-700", dot: "bg-amber-400" },
                       "Frozen": { bg: "bg-blue-100 text-blue-700", dot: "bg-blue-500" },
+                      "Not Fresh": { bg: "bg-red-100 text-red-700", dot: "bg-red-500" },
+                      "Uncertain": { bg: "bg-yellow-100 text-yellow-700", dot: "bg-yellow-500" },
                     };
                     const fStyle = freshnessStyle[listing.freshness] || freshnessStyle["Fresh"];
 
@@ -753,7 +763,7 @@ export default function BuyerDashboard() {
                         <div className="p-6">
                           {/* Freshness & time badge */}
                           <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${fStyle.bg}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${fStyle.dot}`}></span>
                                 {listing.freshness}
@@ -761,6 +771,12 @@ export default function BuyerDashboard() {
                               {listing.availability && (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                                   ⏱ {listing.availability}
+                                </span>
+                              )}
+                              {listing.freshnessAssurance?.verified && (
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/20 select-none">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                  🛡️ Assured
                                 </span>
                               )}
                             </div>

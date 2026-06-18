@@ -70,6 +70,13 @@ interface FishListing {
   imageUrl?: string;
   isActive: boolean;
   createdAt: string;
+  freshnessAssurance?: {
+    verified: boolean;
+    aiLabel: string;
+    confidence: number;
+    allScores?: Record<string, number>;
+    evaluatedAt?: string;
+  };
 }
 
 const fishOptions = [
@@ -653,13 +660,31 @@ export default function DashboardPage() {
 
                     {/* Fish badge */}
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full text-white bg-gradient-to-r from-[#11998e] to-[#38ef7d]">
                           🐟 {listing.freshness}
                         </span>
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                           ⏱ {listing.availability}
                         </span>
+                        {listing.freshnessAssurance?.verified && (
+                          <div className="group/tooltip relative inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/20 cursor-help select-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            🛡️ Assured
+                            
+                            {/* Tooltip */}
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900/95 backdrop-blur-sm text-white text-[10px] font-medium p-2.5 rounded-lg shadow-lg border border-slate-800 opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity duration-200 z-50 leading-relaxed text-left">
+                              <span className="block font-bold text-emerald-400 border-b border-slate-700 pb-1 mb-1">✓ Freshway Assured</span>
+                              <span className="block text-slate-300">AI Result: <span className="font-bold text-white">{listing.freshnessAssurance.aiLabel}</span></span>
+                              <span className="block text-slate-300">Confidence: <span className="font-bold text-white">{(listing.freshnessAssurance.confidence * 100).toFixed(1)}%</span></span>
+                              {listing.freshnessAssurance.evaluatedAt && (
+                                <span className="block text-[8px] text-slate-400 mt-1 border-t border-slate-800 pt-1">
+                                  Verified: {new Date(listing.freshnessAssurance.evaluatedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${listing.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                         {listing.isActive ? "● Live" : "● Inactive"}

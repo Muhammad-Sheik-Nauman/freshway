@@ -1,15 +1,20 @@
 # ─── Dataset & Training Data ─────────────────────────────
 server/data/train/
 server/data/val/
+server/scratch/fish_eye_dataset/
+server/scratch/yolo_runs/
 
 # ─── Trained Models (too large for git) ──────────────────
-
+server/models/*.keras
+server/models/*.pt
+server/yolov8n.pt
 
 # ─── Training Logs ───────────────────────────────────────
 server/logs/
 
-# ─── Temp Files ──────────────────────────────────────────
+# ─── Temp & Editor Files ──────────────────────────────────
 server/temp/
+.vscode/
 
 # ─── Python ──────────────────────────────────────────────
 __pycache__/

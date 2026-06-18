@@ -37,8 +37,22 @@ def predict_endpoint():
         lat = float(request.form.get("lat")) if request.form.get("lat") else None
         lng = float(request.form.get("lng")) if request.form.get("lng") else None
         
+        # Parse manual crop box coordinates if provided by the frontend
+        x = request.form.get("x")
+        y = request.form.get("y")
+        w = request.form.get("w")
+        h = request.form.get("h")
+        
+        manual_box = None
+        if x is not None and y is not None and w is not None and h is not None:
+            try:
+                manual_box = [int(float(x)), int(float(y)), int(float(w)), int(float(h))]
+                print(f"[API] Using manual crop coordinates: {manual_box}")
+            except Exception as pe:
+                print(f"[API] Failed to parse manual crop coordinates: {pe}")
+
         # Run the MobileNetV2 prediction pipeline
-        result = predict(image_path, lat, lng)
+        result = predict(image_path, lat, lng, manual_box=manual_box)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e), "status": "error"}), 500
@@ -55,4 +69,4 @@ def health_check():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

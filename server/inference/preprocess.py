@@ -7,8 +7,8 @@ MobileNetV2 expects pixels in [-1, 1] range, NOT [0, 1].
 """
 
 import numpy as np
-from tensorflow.keras.preprocessing import image as keras_image
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from keras.preprocessing import image as keras_image
+from keras.applications.mobilenet_v2 import preprocess_input
 
 
 # MobileNetV2 expects 224x224 input

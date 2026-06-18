@@ -27,6 +27,7 @@ interface PredictionResult {
 export default function CapturePage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [cropPos, setCropPos] = useState<{ x: number, y: number } | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -136,6 +137,7 @@ export default function CapturePage() {
   const resetImage = () => {
     setSelectedImage(null);
     setImageFile(null);
+    setCropPos(null);
     setResult(null);
     setShowResult(false);
     stopCamera();
@@ -153,6 +155,13 @@ export default function CapturePage() {
         resolve(null);
       }
     });
+  };
+
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setCropPos({ x, y });
   };
 
   const analyzeFreshness = async () => {
@@ -183,21 +192,56 @@ export default function CapturePage() {
         formData.append("lng", coords.lng.toString());
       }
 
+      // Add manual crop coordinates if set by the user
+      if (cropPos) {
+        const img = new Image();
+        img.src = selectedImage!;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+        const originalWidth = img.naturalWidth;
+        const originalHeight = img.naturalHeight;
+        
+        // Target crop size is 22% of the smaller dimension of the image
+        const size = Math.min(originalWidth, originalHeight) * 0.22;
+        const centerX = (cropPos.x / 100) * originalWidth;
+        const centerY = (cropPos.y / 100) * originalHeight;
+        
+        const x = Math.max(0, centerX - size / 2);
+        const y = Math.max(0, centerY - size / 2);
+        
+        formData.append("x", x.toString());
+        formData.append("y", y.toString());
+        formData.append("w", size.toString());
+        formData.append("h", size.toString());
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
       const response = await fetch("http://localhost:5000/predict", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       const data: PredictionResult = await response.json();
       setResult(data);
       setShowResult(true);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Analysis failed:", error);
+      const isTimeout = error instanceof Error && error.name === "AbortError";
+      const isNetwork = error instanceof TypeError && error.message.includes("fetch");
       setResult({
-        freshness: "Invalid Image",
+        freshness: "Error",
         confidence: 0,
         status: "error",
-        message: "Could not connect to the analysis server. Make sure the backend (app.py) is running on port 5000.",
+        message: isTimeout
+          ? "Analysis timed out. The image may be too large or the server is busy. Please try again."
+          : isNetwork
+          ? "Cannot reach the server. Please make sure app.py is running on port 5000 and try again."
+          : "Analysis failed unexpectedly. Please try again.",
       });
       setShowResult(true);
     } finally {
@@ -305,19 +349,46 @@ export default function CapturePage() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="relative aspect-square w-full max-w-md mx-auto overflow-hidden rounded-xl border-4 border-white shadow-lg">
+              <div 
+                className="relative w-full max-w-md mx-auto overflow-hidden rounded-xl border-4 border-white shadow-lg cursor-crosshair select-none"
+                onClick={handleImageClick}
+              >
                 <img
                   src={selectedImage!}
                   alt="Captured fish eye"
-                  className="w-full h-full object-cover"
+                  className="w-full h-auto"
                 />
+                
+                {/* Manual Crop target indicator */}
+                {cropPos && (
+                  <div 
+                    className="absolute border-2 border-dashed border-emerald-400 bg-emerald-300/25 rounded-full pointer-events-none flex items-center justify-center animate-pulse"
+                    style={{
+                      left: `${cropPos.x}%`,
+                      top: `${cropPos.y}%`,
+                      width: "70px",
+                      height: "70px",
+                      transform: "translate(-50%, -50%)"
+                    }}
+                  >
+                    <div className="absolute w-full h-[1px] bg-emerald-400/50"></div>
+                    <div className="absolute h-full w-[1px] bg-emerald-400/50"></div>
+                  </div>
+                )}
+
                 <button
-                  onClick={resetImage}
-                  className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resetImage();
+                  }}
+                  className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors cursor-pointer"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
               </div>
+              <p className="text-xs text-[#3a4a5a]/75 text-center mt-2">
+                🎯 <strong>Tip:</strong> Tap on the fish eye in the photo to manually align the crop circle before analyzing.
+              </p>
 
               {/* Analysis Result */}
               {result && (
@@ -368,10 +439,10 @@ export default function CapturePage() {
               <div className="flex flex-col gap-4">
                 <button
                   onClick={analyzeFreshness}
-                  disabled={isAnalyzing}
-                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${isAnalyzing
-                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                    : "bg-[#3a7bd5] text-white hover:bg-[#255bb5]"
+                  disabled={isAnalyzing || !cropPos}
+                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${(isAnalyzing || !cropPos)
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none"
+                    : "bg-[#3a7bd5] text-white hover:bg-[#255bb5] cursor-pointer"
                     }`}
                 >
                   {isAnalyzing ? (
@@ -382,6 +453,11 @@ export default function CapturePage() {
                       </svg>
                       {gettingLocation ? "Locating buyers nearby..." : "Analyzing..."}
                     </>
+                  ) : !cropPos ? (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2"/></svg>
+                      Tap on the Fish Eye to start
+                    </>
                   ) : (
                     <>
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
@@ -391,7 +467,7 @@ export default function CapturePage() {
                 </button>
                 <button
                   onClick={resetImage}
-                  className="w-full py-3 bg-transparent text-[#3a4a5a] font-medium hover:text-[#1a2a3a] transition-colors"
+                  className="w-full py-3 bg-transparent text-[#3a4a5a] font-medium hover:text-[#1a2a3a] transition-colors cursor-pointer"
                 >
                   Retake Photo
                 </button>

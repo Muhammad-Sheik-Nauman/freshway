@@ -16,8 +16,12 @@ server/logs/
 server/temp/
 .vscode/
 
+# ─── Server Logs ─────────────────────────────────────────
+server/server.log
+
 # ─── Python ──────────────────────────────────────────────
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.egg-info/

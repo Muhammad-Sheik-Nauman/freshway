@@ -8,6 +8,15 @@ Two-stage inference pipeline with Multi-Crop Averaging (ITA).
 import os
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
+from tensorflow.keras.applications.efficientnet import preprocess_input as efficientnet_preprocess
+
+# Inject into builtins so Keras Lambda deserialization can find them in the global namespace
+import builtins
+builtins.mobilenet_preprocess = mobilenet_preprocess
+builtins.efficientnet_preprocess = efficientnet_preprocess
+_ = (builtins, mobilenet_preprocess, efficientnet_preprocess)  # Prevent unused import warnings
+
 import requests
 import base64
 import cv2
@@ -114,21 +123,40 @@ RF_URL = f"https://detect.roboflow.com/infer/workflows/{RF_WORKSPACE}/{RF_WORKFL
 
 # ─── MODEL LOADING ───────────────────────────────────────────────────────────
 _model = None
+_is_ensemble = False  # Ensemble model has preprocessing baked in
 
 def _load_model():
-    """Load the trained MobileNetV2 model."""
-    global _model
+    """Load the best available freshness model (ensemble preferred, MobileNetV2 fallback)."""
+    global _model, _is_ensemble
     if _model is not None:
         return _model
-    model_paths = [
+
+    # Priority 1: Ensemble model (MobileNetV2 + EfficientNetB0)
+    ensemble_paths = [
+        os.path.join(MODEL_DIR, "freshness_ensemble_best.keras"),
+        os.path.join(MODEL_DIR, "freshness_ensemble_final.keras"),
+    ]
+    for path in ensemble_paths:
+        if os.path.exists(path):
+            print(f"[MODEL] Loading ENSEMBLE model from: {path}")
+            _model = tf.keras.models.load_model(path, safe_mode=False)
+            _is_ensemble = True
+            return _model
+
+    # Priority 2: Legacy single MobileNetV2 model
+    legacy_paths = [
         os.path.join(MODEL_DIR, "freshness_model_best.keras"),
         os.path.join(MODEL_DIR, "freshness_model_final.keras"),
     ]
-    for path in model_paths:
+    for path in legacy_paths:
         if os.path.exists(path):
-            _model = tf.keras.models.load_model(path)
+            print(f"[MODEL] Loading legacy MobileNetV2 model from: {path}")
+            _model = tf.keras.models.load_model(path, safe_mode=False)
+            _is_ensemble = False
             return _model
+
     raise FileNotFoundError(f"No trained model found!")
+
 
 _yolo_model = None
 
@@ -270,24 +298,26 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
         H, W = img_raw.shape[:2]
 
         # Validate manual crop if provided by the user (reject fins, scales, etc.)
+        # NOTE: We use generous padding (100%) because YOLO was trained on full
+        # images, not tight eye crops.  If YOLO still can't confirm, we trust
+        # the user's explicit tap rather than blocking them.
         if manual_box:
             x, y, w, h = manual_box
-            # Add padding to give YOLO context for validation
-            pad_x = int(w * 0.4)
-            pad_y = int(h * 0.4)
+            pad_x = int(w * 1.0)
+            pad_y = int(h * 1.0)
             x1 = max(0, x - pad_x)
             y1 = max(0, y - pad_y)
             x2 = min(W, x + w + pad_x)
             y2 = min(H, y + h + pad_y)
             validation_crop = img_raw[y1:y2, x1:x2]
             
-            if not _validate_eye_crop(validation_crop):
-                return {
-                    "freshness": "Invalid Image",
-                    "confidence": 0,
-                    "status": "error",
-                    "message": "No fish eye detected in the selected area. Please ensure you tap directly on the eye.",
-                }
+            is_valid = _validate_eye_crop(validation_crop)
+            if not is_valid:
+                # Last resort: try validating on the full image instead of the crop
+                is_valid = _validate_eye_crop(img_raw)
+            if not is_valid:
+                print("[PREDICT] YOLO could not confirm eye in manual crop — trusting user tap anyway")
+                # We trust the user's manual selection rather than blocking
 
         # STEP 0: Enhance image to handle blur before detection
         img_enhanced = _enhance_image(img_raw)
@@ -352,35 +382,61 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
             x2, y2 = min(W, x + w + pad_x + shift_x), min(H, y + h + pad_y + shift_y)
             
             crop = img[y1:y2, x1:x2]
-            crop_temp_path = f"{image_path}_crop_{i}.jpg"
-            cv2.imwrite(crop_temp_path, crop)
 
-            # Analyze this specific crop
+            # Analyze this specific crop using the preloaded model in memory
             model = _load_model()
-            processed_img = preprocess_for_inference(crop_temp_path)
+
+            if _is_ensemble:
+                # Ensemble model has preprocessing baked in — feed raw [0, 255] RGB
+                img_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                img_resized = cv2.resize(img_rgb, (224, 224))
+                processed_img = np.expand_dims(img_resized.astype(np.float32), axis=0)
+            else:
+                # Legacy MobileNetV2 model needs external preprocessing
+                processed_img = preprocess_for_inference(crop)
+
             ai_preds = model.predict(processed_img, verbose=0)[0]
-            expert_probs = analyze_expert_rules(crop_temp_path)
             
             # Map AI outputs to [highly_fresh, fresh, not_fresh]
             # Model CLASS_NAMES = ["fresh", "highly_fresh", "not_fresh"]
             # so: preds[0]=fresh, preds[1]=highly_fresh, preds[2]=not_fresh
             ai_reordered = np.array([ai_preds[1], ai_preds[0], ai_preds[2]])
 
+            # Call expert rules with debug information enabled, passing in-memory array directly
+            expert_probs, triggered_rules = analyze_expert_rules(crop, return_debug=True)
             expert_arr = np.array(expert_probs)
 
-            # GUARD: If expert rules signal Not Fresh (>0.40),
-            # trust the physical evidence (cloudiness, low saturation, etc.) over the AI model
-            # which is prone to false positives on glares/watermarks.
-            if expert_arr[2] > 0.40:
-                crop_probs = (ai_reordered * 0.15) + (expert_arr * 0.85)
-            elif expert_arr[0] > 0.55 and ai_reordered[0] < 0.50:
-                # Expert strongly says Highly Fresh but AI isn't confident — trust expert
-                crop_probs = (ai_reordered * 0.20) + (expert_arr * 0.80)
-            else:
-                # Normal case: 35% AI, 65% expert
-                crop_probs = (ai_reordered * 0.35) + (expert_arr * 0.65)
+            # Determine CNN Confidence
+            cnn_confidence = float(np.max(ai_reordered))
+            override_occurred = False
+            override_reason = ""
 
-            print(f"[CROP {i}] AI={ai_reordered.round(2)} Expert={expert_arr.round(2)} Final={crop_probs.round(2)}")
+            # Check for physical veto conditions
+            is_veto = any(k.startswith("VETO_") for k in triggered_rules.keys())
+
+            if is_veto:
+                # Direct override by veto
+                crop_probs = expert_arr
+                override_occurred = True
+                veto_key = [k for k in triggered_rules.keys() if k.startswith("VETO_")][0]
+                override_reason = f"Hard Veto Triggered: {veto_key} ({triggered_rules[veto_key]})"
+            elif cnn_confidence >= 0.60:
+                # Trust the CNN completely if it is highly confident
+                crop_probs = ai_reordered
+                override_reason = "None (Trusted high confidence CNN)"
+            else:
+                # Uncertainty fusion: 80% CNN, 20% Expert Rules
+                crop_probs = (ai_reordered * 0.80) + (expert_arr * 0.20)
+                override_occurred = True
+                override_reason = f"Uncertainty Fusion (CNN Conf = {cnn_confidence:.2f} < 0.60)"
+
+            # Print detailed debugging output
+            print(f"[CROP {i}] Detailed Prediction Debug:")
+            print(f"  - CNN Probs:    [Highly Fresh={ai_reordered[0]:.3f}, Fresh={ai_reordered[1]:.3f}, Not Fresh={ai_reordered[2]:.3f}]")
+            print(f"  - Expert Probs: [Highly Fresh={expert_arr[0]:.3f}, Fresh={expert_arr[1]:.3f}, Not Fresh={expert_arr[2]:.3f}]")
+            print(f"  - Final Fused:  [Highly Fresh={crop_probs[0]:.3f}, Fresh={crop_probs[1]:.3f}, Not Fresh={crop_probs[2]:.3f}]")
+            print(f"  - Override:     {'YES' if override_occurred else 'NO'} ({override_reason})")
+            print(f"  - Active Rules: {list(triggered_rules.values())}")
             all_crop_probs.append(crop_probs)
 
             # Capture the detected eye crop as the annotated image (zoomed in)
@@ -401,8 +457,6 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
 
                 _, buffer = cv2.imencode('.jpg', eye_crop, [cv2.IMWRITE_JPEG_QUALITY, 92])
                 annotated_b64 = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
-
-            if os.path.exists(crop_temp_path): os.remove(crop_temp_path)
 
         # STEP 3: Average the Jury's Vote
         combined_probs = np.mean(all_crop_probs, axis=0)

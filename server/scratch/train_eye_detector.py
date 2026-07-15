@@ -12,7 +12,10 @@ import sys
 import shutil
 
 # ── CONFIG ─────────────────────────────────────────────────────────────────
-API_KEY      = "UKX1beagTuTJScwPDy4J"
+API_KEY      = os.environ.get("ROBOFLOW_API_KEY")
+if not API_KEY:
+    print("Error: ROBOFLOW_API_KEY not found in environment variables.")
+    sys.exit(1)
 WORKSPACE    = "sowmya-ehtuu"
 PROJECT      = "fish-eye-detection-fxm8r"
 VERSION      = 1

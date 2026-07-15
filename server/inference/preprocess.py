@@ -25,7 +25,9 @@ LABEL_MAP = {
 }
 
 
-def preprocess_for_inference(image_path: str) -> np.ndarray:
+import cv2
+
+def preprocess_for_inference(image_path_or_arr) -> np.ndarray:
     """
     Load and preprocess an image for MobileNetV2 inference.
 
@@ -34,13 +36,21 @@ def preprocess_for_inference(image_path: str) -> np.ndarray:
     - Apply MobileNetV2 preprocess_input (scales to [-1, 1])
 
     Args:
-        image_path: Path to the image file.
+        image_path_or_arr: Path to the image file (str) or loaded OpenCV BGR array (numpy.ndarray).
 
     Returns:
         Preprocessed image as a numpy array with shape (1, 224, 224, 3).
     """
-    img = keras_image.load_img(image_path, target_size=IMG_SIZE)
-    img_array = keras_image.img_to_array(img)  # shape: (224, 224, 3), values: [0, 255]
+    if isinstance(image_path_or_arr, str):
+        img_bgr = cv2.imread(image_path_or_arr)
+        if img_bgr is None:
+            raise FileNotFoundError(f"Failed to read image at: {image_path_or_arr}")
+    else:
+        img_bgr = image_path_or_arr
+
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    img_resized = cv2.resize(img_rgb, IMG_SIZE)
+    img_array = img_resized.astype(np.float32)
     img_array = np.expand_dims(img_array, axis=0)  # shape: (1, 224, 224, 3)
     img_array = preprocess_input(img_array)  # scales to [-1, 1] for MobileNetV2
     return img_array

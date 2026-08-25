@@ -26,7 +26,7 @@ server/
 │   ├── __init__.py
 │   └── routing.py                  # Market routing based on freshness label
 │
-├── models/                         # 💾 Trained model files (NOT in git)
+├── models/                         # 💾 Trained model files
 │   ├── freshness_model_best.keras      # Best model checkpoint (auto-saved during training)
 │   ├── freshness_model_final.keras     # Final model after training completes
 │   ├── freshness_checkpoint.keras      # Resume checkpoint (used for pause/resume training)
@@ -102,8 +102,8 @@ python training/train_freshness_classifier.py
 Training runs in **two phases**:
 | Phase | What it does | Epochs |
 |-------|-------------|--------|
-| **Phase 1** | Trains only the classification head (MobileNetV2 base frozen) | 15 |
-| **Phase 2** | Fine-tunes last 30 layers of MobileNetV2 | Up to 50 (early stops) |
+| **Phase 1** | Trains only the classification head (MobileNetV2 base frozen) | 20 |
+| **Phase 2** | Fine-tunes last 50 layers of MobileNetV2 | Up to 40 (early stops) |
 
 ### Step 3: Resume Training (if interrupted)
 Just run the same command again:
@@ -172,7 +172,7 @@ It automatically detects the checkpoint and resumes from where you left off.
 **What it does:**
 - Loads image from file path
 - Resizes to **224×224** pixels (MobileNetV2 input size)
-- Normalizes pixel values to **[0, 1]**
+- Applies MobileNetV2 `preprocess_input`, scaling pixel values to **[-1, 1]**
 - Adds batch dimension
 
 **What to modify:**
@@ -190,9 +190,11 @@ MobileNetV2 (pretrained on ImageNet, frozen/fine-tuned)
     ↓
 Global Average Pooling
     ↓
-Dense(256) → BatchNorm → Dropout(0.5)
+Dense(512) → BatchNorm → Dropout(0.4)
     ↓
-Dense(128) → BatchNorm → Dropout(0.3)
+Dense(256) → BatchNorm → Dropout(0.3)
+    ↓
+Dense(128) → BatchNorm → Dropout(0.2)
     ↓
 Softmax(3 classes)
 ```
@@ -255,7 +257,7 @@ Softmax(3 classes)
 | Image Size | `inference/preprocess.py` | `224×224` |
 | Confidence Threshold | `inference/predict.py` | `0.60 (60%)` |
 | Batch Size | `training/train_freshness_classifier.py` | `32` |
-| Learning Rate | `training/train_freshness_classifier.py` | `1e-4 (Phase 1), 1e-5 (Phase 2)` |
+| Learning Rate | `training/train_freshness_classifier.py` | `5e-4 (Phase 1), 1e-5 (Phase 2)` |
 
 ---
 
@@ -277,7 +279,7 @@ Install all: `pip install -r requirements.txt`
 ## ❓ FAQ
 
 **Q: Do I need to train the model every time I run the server?**
-A: No! Training is a one-time process. Once the `.keras` model files are saved, the server just loads them on startup.
+A: No. Training is a separate process. The server lazy-loads the first available `.keras` model on the first prediction request.
 
 **Q: Where do I get the dataset?**
 A: Ask the team lead for the fish eye dataset zip file. Extract and organize into `data/train/` and `data/val/` folders.

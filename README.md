@@ -39,7 +39,7 @@ http://localhost:3000
 
 ### 3. Install Backend (Server)
 ```bash
-cd ../../server
+cd ../server
 pip install -r requirements.txt
 ```
 Start backend server:
@@ -54,7 +54,7 @@ http://localhost:5000
 ### 4. Environment Variables
 Create:
 ```
-client/my-app/.env.local
+client/.env.local
 ```
 Example:
 ```
@@ -85,7 +85,6 @@ pip --version
 ```
 freshway/
   client/           → Frontend (Next.js/React)
-    my-app/         → Main app
   server/           → Backend (Flask, ML, API)
     data/           → Datasets
     models/         → Saved models
@@ -95,7 +94,6 @@ freshway/
     utils/          → Utilities
     app.py          → API entry
     requirements.txt
-  docs/             → Documentation (optional)
 ```
 
 ---

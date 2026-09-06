@@ -13,6 +13,12 @@ import tensorflow as tf
 from inference.preprocess import preprocess_for_inference, CLASS_NAMES, LABEL_MAP
 from business_logic.routing import route_market
 
+# Optional image quality validation
+try:
+    from utils.image_utils import validate_image_quality
+except ImportError:
+    validate_image_quality = None
+
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 CONFIDENCE_THRESHOLD = 0.60  # Minimum confidence to accept a prediction
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,11 +34,15 @@ def _load_model():
     if _model is not None:
         return _model
 
-    # Try best model first, then final model
+    # Production model: validated EXP-006 checkpoint.
     model_paths = [
-        os.path.join(MODEL_DIR, "freshness_model_best.keras"),
-        os.path.join(MODEL_DIR, "freshness_model_final.keras"),
-    ]
+    os.path.join(
+        MODEL_DIR,
+        "experiments",
+        "exp006_v25_mobilenetv2",
+        "freshness_exp006_best.keras",
+    ),
+]
 
     for path in model_paths:
         if os.path.exists(path):
@@ -57,45 +67,60 @@ def predict(image_path: str) -> dict:
 
     Returns:
         dict with keys:
-            - freshness: Human-readable freshness label
-            - confidence: Prediction confidence (0-1)
-            - status: "success" or "uncertain"
-            - message: Description of the result
-            - market_route: Suggested market destination
-            - all_scores: Confidence for each class
+            - freshness: Human-readable freshness label ("Highly Fresh", "Fresh", "Not Fresh", "Uncertain")
+            - confidence: Prediction confidence as percentage (0.0 to 100.0)
+            - status: "success" or "uncertain" or "error"
+            - message: Human-readable description of the result
+            - market_route: Suggested supply-chain market destination
+            - all_scores: Confidence percentage for each class { "Fresh": float, ... }
+            - warnings: Optional list of image quality warnings (e.g. glare, blur)
     """
     try:
-        # 1. Load model
+        # 1. Image quality inspection (glare, blur)
+        quality_warnings = []
+        if validate_image_quality is not None:
+            try:
+                quality_res = validate_image_quality(image_path)
+                quality_warnings = quality_res.get("warnings", [])
+            except Exception:
+                pass
+
+        # 2. Load model
         model = _load_model()
 
-        # 2. Preprocess image
+        # 3. Preprocess image with direct 224x224 nearest-neighbor resize
         processed_img = preprocess_for_inference(image_path)
 
-        # 3. Run prediction
+        # 4. Run prediction
         predictions = model.predict(processed_img, verbose=0)
         predicted_class_idx = np.argmax(predictions[0])
         confidence = float(predictions[0][predicted_class_idx])
         predicted_class = CLASS_NAMES[predicted_class_idx]
         freshness_label = LABEL_MAP[predicted_class]
 
-        # 4. Build all scores dict
+        # 5. Build all scores dict (percentage 0 - 100)
         all_scores = {
             LABEL_MAP[CLASS_NAMES[i]]: round(float(predictions[0][i]) * 100, 1)
             for i in range(len(CLASS_NAMES))
         }
 
-        # 5. Confidence gating
+        # 6. Confidence gating (< 60% threshold)
         if confidence < CONFIDENCE_THRESHOLD:
+            msg = f"Low confidence ({confidence*100:.1f}%). Please retake the photo with better lighting and focus on the fish eye."
+            if quality_warnings:
+                msg += f" (Note: {'; '.join(quality_warnings)})"
+
             return {
                 "freshness": "Uncertain",
                 "confidence": round(confidence * 100, 1),
                 "status": "uncertain",
-                "message": f"Low confidence ({confidence*100:.1f}%). Please retake the photo with better lighting and focus on the fish eye.",
+                "message": msg,
                 "market_route": route_market("Uncertain"),
                 "all_scores": all_scores,
+                "warnings": quality_warnings,
             }
 
-        # 6. Route to market
+        # 7. Route to market
         market = route_market(freshness_label)
 
         return {
@@ -105,6 +130,7 @@ def predict(image_path: str) -> dict:
             "message": f"Fish eye analyzed: {freshness_label} with {confidence*100:.1f}% confidence.",
             "market_route": market,
             "all_scores": all_scores,
+            "warnings": quality_warnings,
         }
 
     except FileNotFoundError as e:
@@ -113,6 +139,7 @@ def predict(image_path: str) -> dict:
             "confidence": 0,
             "status": "error",
             "message": str(e),
+            "warnings": [],
         }
     except Exception as e:
         return {
@@ -120,4 +147,5 @@ def predict(image_path: str) -> dict:
             "confidence": 0,
             "status": "error",
             "message": f"Prediction failed: {str(e)}",
+            "warnings": [],
         }

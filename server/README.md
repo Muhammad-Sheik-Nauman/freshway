@@ -27,8 +27,10 @@ server/
 │   └── routing.py                  # Market routing based on freshness label
 │
 ├── models/                         # 💾 Trained model files
-│   ├── freshness_model_best.keras      # Best model checkpoint (auto-saved during training)
-│   ├── freshness_model_final.keras     # Final model after training completes
+│   ├── freshness_model_best.keras      # Preserved baseline model
+│   ├── freshness_model_final.keras     # Preserved baseline model
+│   ├── experiments/exp006_v25_mobilenetv2/
+│   │   └── freshness_exp006_best.keras # Production model (69.42% test accuracy)
 │   ├── freshness_checkpoint.keras      # Resume checkpoint (used for pause/resume training)
 │   └── training_progress.json          # Training progress tracker (epoch, phase, accuracy)
 │
@@ -182,35 +184,42 @@ It automatically detects the checkpoint and resumes from where you left off.
 ---
 
 ### `training/train_freshness_classifier.py` — Model Training
-**Purpose:** Trains the MobileNetV2 CNN model on fish eye images.
+**Purpose:** Trains the MobileNetV2 / EfficientNetV2 CNN model on fish eye images.
 
-**Architecture:**
+**Architecture (Optimized v2.5):**
 ```
-MobileNetV2 (pretrained on ImageNet, frozen/fine-tuned)
+MobileNetV2 / EfficientNetV2-B0 (ImageNet Pretrained)
     ↓
-Global Average Pooling
+Global Average Pooling 2D
     ↓
-Dense(512) → BatchNorm → Dropout(0.4)
+Dropout(0.35)
     ↓
-Dense(256) → BatchNorm → Dropout(0.3)
+Dense(128, activation='swish')
     ↓
-Dense(128) → BatchNorm → Dropout(0.2)
+Dropout(0.20)
     ↓
-Softmax(3 classes)
+Dense(3, activation='softmax') [fresh, highly_fresh, not_fresh]
 ```
 
-**Features:**
-- ✅ Transfer learning from ImageNet
-- ✅ Data augmentation (rotation, flip, zoom, brightness)
-- ✅ Early stopping & learning rate scheduling
+**Features & Accuracy Optimizations:**
+- ✅ Transfer learning with ImageNet weights
+- ✅ **Batch Normalization Freezing Protocol** during Phase 2 fine-tuning (prevents ImageNet statistics corruption)
+- ✅ Streamlined Swish bottleneck head (eliminates train/test variance shift)
+- ✅ Biology-safe data augmentation (reflect fill mode, bounded brightness, aspect ratio preservation)
+- ✅ Label smoothing (0.10) to smooth continuous class transitions
+- ✅ Multi-backbone CLI support (`--backbone mobilenetv2` or `efficientnetv2`)
 - ✅ Checkpoint/resume support
-- ✅ TensorBoard logging
 
-**What to modify:**
-- `BATCH_SIZE` — decrease if running out of RAM (try 16)
-- `PHASE1_EPOCHS` / `PHASE2_EPOCHS` — more epochs = longer training
-- `LEARNING_RATE` — lower = slower but potentially better
-- Data augmentation parameters in `create_data_generators()`
+---
+
+### `training/evaluate.py` — Model Evaluation & Diagnostics
+**Purpose:** Comprehensive performance evaluation and confusion matrix diagnostics.
+
+**Outputs:**
+- Categorical confusion matrix (Actual vs Predicted)
+- Per-class Precision, Recall, and F1-Scores
+- Severe misclassification tracking (Highly Fresh <-> Not Fresh)
+- Detailed JSON report in `models/evaluation_report.json`
 
 ---
 

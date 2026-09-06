@@ -2,6 +2,7 @@
 
 > **Document Version:** 1.0.0  
 > **Date:** August 2026  
+> **Last Updated:** 2026-09-04 23:41 IST (Dataset and Environment Investigation Addendum)  
 > **Target Audience:** Development Team, ML Engineers, Product Leads & Contributors  
 > **Status:** Active Reference Document for Ongoing & Future Development  
 
@@ -98,60 +99,27 @@ The platform allows dock workers, quality inspectors, distributors, and retailer
 
 ## 4. Critical Bugs & Immediate Code Fixes
 
-The following bugs were identified during the codebase audit and should be resolved as priority zero:
+The following bugs were identified during the codebase audit and resolved in Version 1.1:
 
-### 🐛 Bug 1: Object-as-CSS-Class in Result Display (`capture-img/page.tsx:301`)
-- **Issue:** `getFreshnessColor(result.freshness)` returns `{ bg: string, text: string, icon: string }`. Line 301 injects `${getFreshnessColor(result.freshness)}` directly into `className`, resulting in `class="text-2xl font-bold [object Object]"`.
-- **Fix:**
-```tsx
-// Before:
-<p className={`text-2xl font-bold ${getFreshnessColor(result.freshness)}`}>
+### 🐛 Bug 1: Object-as-CSS-Class in Result Display (`capture-img/page.tsx:301`) — `RESOLVED`
+- **Issue:** `getFreshnessColor(result.freshness)` returns `{ bg: string, text: string, icon: string }`. Line 301 injected `${getFreshnessColor(result.freshness)}` directly into `className`, resulting in `class="text-2xl font-bold [object Object]"`.
+- **Resolution:** Updated to `${getFreshnessColor(result.freshness).text}`.
 
-// After:
-<p className={`text-2xl font-bold ${getFreshnessColor(result.freshness).text}`}>
-```
+### 🐛 Bug 2: 100x Percentage Display & Progress Bar Overflow (`capture-img/page.tsx:311, 315`) — `RESOLVED`
+- **Issue:** The backend `predict.py` already returns confidence formatted as percentage `0 - 100` (e.g. `85.3`). In `capture-img/page.tsx`, lines 311 and 315 multiplied this by 100 again, rendering `8530.0%` and `width: 8530%`.
+- **Resolution:** Removed the redundant `* 100` multiplier and clamped width to $[0, 100]\%$.
 
-### 🐛 Bug 2: 100x Percentage Display & Progress Bar Overflow (`capture-img/page.tsx:311, 315`)
-- **Issue:** The backend `predict.py` already returns confidence formatted as percentage `0 - 100` (e.g. `85.3`). In `capture-img/page.tsx`, lines 311 and 315 multiply this by 100 again, rendering `8530.0%` and `width: 8530%`.
-- **Fix:**
-```tsx
-// Line 311:
-<span className="font-bold">{Number(result.confidence).toFixed(1)}%</span>
+### 🐛 Bug 3: Duplicate Canvas Blob Conversion (`capture-img/page.tsx:92-108`) — `RESOLVED`
+- **Issue:** `capturePhoto()` called `canvas.toBlob()` twice in a row with different file names (`captured_fish_eye.png` and `captured-photo.png`), creating redundant execution.
+- **Resolution:** Consolidated into a single clean callback setting the upload file and invoking `stopCamera()`.
 
-// Line 315:
-<div
-  className="h-full rounded-full bg-gradient-to-r from-[#3a7bd5] to-[#00d2ff] transition-all duration-700"
-  style={{ width: `${Math.min(100, Math.max(0, result.confidence))}%` }}
-/>
-```
+### 🐛 Bug 4: Insecure Temporary File Handling & Race Conditions (`server/app.py:28-29`) — `RESOLVED`
+- **Issue:** `image.save(os.path.join("temp", image.filename))` used raw client filenames, creating risk of collisions and directory traversal.
+- **Resolution:** Implemented `uuid.uuid4().hex` unique filenames and file extension validation against allowed formats (`.jpg`, `.jpeg`, `.png`, `.webp`) with `werkzeug.utils.secure_filename`.
 
-### 🐛 Bug 3: Duplicate Canvas Blob Conversion (`capture-img/page.tsx:92-108`)
-- **Issue:** `capturePhoto()` calls `canvas.toBlob()` twice in a row with different file names (`captured_fish_eye.png` and `captured-photo.png`), creating redundant execution.
-- **Fix:** Consolidate into a single clean callback that sets both the `File` object and preview data URI.
-
-### 🐛 Bug 4: Insecure Temporary File Handling & Race Conditions (`server/app.py:28-29`)
-- **Issue:** `image.save(os.path.join("temp", image.filename))` uses raw client filenames. If two users upload `image.png` simultaneously or a malicious user supplies `../../evil.sh`, file collision or directory traversal can happen.
-- **Fix:**
-```python
-import uuid
-from werkzeug.utils import secure_filename
-
-ext = os.path.splitext(secure_filename(image.filename))[1] or ".jpg"
-unique_filename = f"{uuid.uuid4().hex}{ext}"
-image_path = os.path.join("temp", unique_filename)
-image.save(image_path)
-```
-
-### 🐛 Bug 5: Hardcoded Backend URL & Proxy Bypass (`capture-img/page.tsx:149`)
-- **Issue:** The client hardcodes `fetch("http://localhost:5000/predict")` instead of using the configured `/api/predict` Next.js rewrite or `process.env.NEXT_PUBLIC_API_URL`.
-- **Fix:**
-```typescript
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
-const response = await fetch(`${API_URL}/predict`, {
-  method: "POST",
-  body: formData,
-});
-```
+### 🐛 Bug 5: Hardcoded Backend URL & Proxy Bypass (`capture-img/page.tsx:149`) — `RESOLVED`
+- **Issue:** The client hardcoded `fetch("http://localhost:5000/predict")` instead of using the configured `/api/predict` Next.js rewrite or `process.env.NEXT_PUBLIC_API_URL`.
+- **Resolution:** Replaced with `process.env.NEXT_PUBLIC_API_URL || "/api"`.
 
 ---
 
@@ -187,6 +155,30 @@ const response = await fetch(`${API_URL}/predict`, {
                     │   - Dynamic Market Routing & Pricing Guidance     │
                     └───────────────────────────────────────────────────┘
 ```
+
+### 5.0 Diagnosed 69% Accuracy Bottleneck & v2.5 Optimization Blueprint
+During empirical benchmarking, the baseline MobileNetV2 model achieved **69.0% accuracy** on the validation set. Codebase and theoretical audit identified five specific failure modes:
+1. **Batch Normalization Destabilization (Phase 2):** Fine-tuning the top 50 layers with standard `base_model.trainable = True` allowed internal Batch Normalization layers to update their moving averages. With small batch sizes (32), this destroyed ImageNet feature maps.
+2. **Head Variance Shift:** The 3-layer Dense head (512 $\rightarrow$ 256 $\rightarrow$ 128) introduced 820k trainable parameters with alternating ReLU $\rightarrow$ BatchNorm $\rightarrow$ Dropout, causing train-test variance shifts.
+3. **Biological Augmentation Artifacts:** `fill_mode="nearest"` created edge streaks mimicking corneal cloudiness; $\pm 30\%$ brightness scaling masked pupil clarity.
+4. **Anisotropic Preprocessing:** Direct non-square image resizing to $224 \times 224$ warped spherical eyeballs into ovals.
+
+**Optimizations Implemented in v2.5 (`train_freshness_classifier.py`):**
+- **BN Freezing Protocol:** Base BN layers explicitly locked in inference mode during fine-tuning.
+- **Swish Bottleneck Head:** Replaced 820k parameter head with a 128-unit Swish bottleneck (164k parameters).
+- **Aspect-Ratio Smart Crop:** Square center-crop before resize to preserve cornea convexity.
+- **Biology-Safe Augmentations:** `fill_mode="reflect"`, bounded brightness $[0.90, 1.10]$, rotation $15^\circ$, no vertical flip.
+- **Label Smoothing:** $0.10$ smoothing to accommodate continuous class transitions.
+- **Diagnostic Tooling:** `evaluate.py` implemented for confusion matrix and per-class metrics.
+
+### 5.0.1 Dataset Compatibility and Reproducibility Gate (Investigation Added 2026-09-04)
+
+No training was run for this investigation. Before any accuracy work resumes, the following prerequisites must be resolved with user approval:
+
+1. Preserve the supplied 24-folder source tree unchanged and reconcile its 4,390 local JPEG files with the 4,392 images published for Mendeley FFE dataset version 1. The two-image gap is in `Nibea Albiflora - Not Fresh`.
+2. Define and retain a deterministic aggregation from the 24 species/freshness folders to FreshWay's three semantic classes, plus a train/validation/test manifest and seed. The original split is unavailable, so a future result will be a new benchmark rather than proof of the historical ~69% result.
+3. Resolve confirmed pipeline alignment gaps before interpreting metrics: the current training generator does not implement the center-crop used by inference, and the evaluator always uses MobileNetV2 preprocessing despite the trainer's EfficientNetV2 option.
+4. Do not replace the existing baseline artifacts while establishing this protocol. The saved model's actual two-hidden-layer head differs from both the committed baseline source and the untrained v2.5 design, so its provenance needs to remain explicit.
 
 ### 5.1 Stage 1: Auto Eye-Crop & Out-of-Distribution Rejection
 - **Problem:** Currently, if a user uploads a photo of a desk, dog, or full fish body from far away, MobileNetV2 still outputs a confidence score for "Fresh/Not Fresh".
@@ -324,11 +316,14 @@ gantt
 
 ### Detailed Phase Breakdown
 
-#### 🔹 Phase 1: Stabilization & Bug Fixes (Sprint 1 — 2 Weeks)
-- [ ] Fix `capture-img/page.tsx` class object interpolation bug.
-- [ ] Fix confidence 100x multiplier display and progress bar width bug.
-- [ ] Refactor temp file upload to use UUID and sanitized filenames.
-- [ ] Standardize API calls via Next.js proxy `/api/predict` with configurable `.env`.
+#### 🔹 Phase 1: Stabilization & Bug Fixes (Sprint 1 — Completed)
+- [x] Fix `capture-img/page.tsx` class object interpolation bug.
+- [x] Fix confidence 100x multiplier display and progress bar width bug.
+- [x] Refactor temp file upload to use UUID and sanitized filenames.
+- [x] Standardize API calls via Next.js proxy `/api/predict` with configurable `.env`.
+- [x] Consolidate duplicate canvas blob conversions in camera capture.
+- [x] Upgrade model training pipeline (v2.5) with BN Freezing Protocol and Swish bottleneck head.
+- [x] Add standalone confusion matrix and evaluation diagnostic suite (`server/training/evaluate.py`).
 - [ ] Add `Dockerfile` and `docker-compose.yml` for unified local development.
 
 #### 🔹 Phase 2: Database, History & FastAPI (Sprint 2 — 3 Weeks)
@@ -365,6 +360,10 @@ gantt
 - Node.js >= 18
 - Python >= 3.9 (Virtual Environment recommended)
 - Git
+
+### 10.1 Verified Python ML Environment Gate (Added 2026-09-04)
+
+The currently available Python 3.14.4 virtual environment is empty and cannot install a supported TensorFlow wheel. Before any model operation, create a separate 64-bit Python 3.11 environment and use TensorFlow 2.21.0 with Keras 3.13.2, matching the baseline archive metadata. Install the API/image dependencies plus SciPy for the training augmentations, then perform only a read-only model-load check. On native Windows, current TensorFlow is CPU-only; evaluate WSL2/NVIDIA only if GPU training is later required and approved.
 
 ### Running Client
 ```bash

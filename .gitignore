@@ -35,3 +35,15 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local Python virtual environments
+.venv/
+.venv-py311/
+
+# Graphify generated output
+graphify-out/
+
+# Local trained model artifacts
+server/models/experiments/
+server/models/backups/
+

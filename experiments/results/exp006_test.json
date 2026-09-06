@@ -1,0 +1,198 @@
+{
+  "dataset_root": "C:\\Users\\LENOVO\\OneDrive\\Desktop\\freshway 2\\fish_dataset",
+  "evaluation_protocol": "freshway-baseline-evaluation-v1",
+  "interpretation": "new reproducible reference evaluation; not a reproduction of the undocumented historical ~69% split",
+  "manifest": "C:\\Users\\LENOVO\\OneDrive\\Desktop\\freshway 2\\freshway\\experiments\\manifests\\baseline_split_v1.json",
+  "manifest_records_sha256": "9b13a20d2f3ad34dcb869945a8f6a1958fd5a84e984d0a5890199305457e431f",
+  "metrics": {
+    "accuracy": 0.69419,
+    "accuracy_percent": 69.42,
+    "confusion_matrix": {
+      "classes": [
+        "Fresh",
+        "Highly Fresh",
+        "Not Fresh"
+      ],
+      "matrix": [
+        [
+          120,
+          33,
+          44
+        ],
+        [
+          35,
+          206,
+          22
+        ],
+        [
+          47,
+          19,
+          128
+        ]
+      ]
+    },
+    "macro_f1": 0.684028,
+    "per_class": {
+      "fresh": {
+        "f1_score": 0.601504,
+        "label": "Fresh",
+        "precision": 0.594059,
+        "recall": 0.609137,
+        "support": 197
+      },
+      "highly_fresh": {
+        "f1_score": 0.790787,
+        "label": "Highly Fresh",
+        "precision": 0.79845,
+        "recall": 0.78327,
+        "support": 263
+      },
+      "not_fresh": {
+        "f1_score": 0.659794,
+        "label": "Not Fresh",
+        "precision": 0.659794,
+        "recall": 0.659794,
+        "support": 194
+      }
+    },
+    "samples": 654,
+    "severe_misclassifications": 41,
+    "weighted_f1": 0.694913
+  },
+  "model": "C:\\Users\\LENOVO\\OneDrive\\Desktop\\freshway 2\\freshway\\server\\models\\experiments\\exp006_v25_mobilenetv2\\freshness_exp006_best.keras",
+  "model_sha256": "270f598b6d635a2f09cbb0635de3b4fee3cc770623d9fcb2c252e461fa8eef1f",
+  "per_source_category": {
+    "Chanos Chanos - Fresh": {
+      "accuracy": 0.583333,
+      "accuracy_percent": 58.33,
+      "samples": 24
+    },
+    "Chanos Chanos - Highly Fresh": {
+      "accuracy": 0.72,
+      "accuracy_percent": 72.0,
+      "samples": 25
+    },
+    "Chanos Chanos - Not Fresh": {
+      "accuracy": 0.8,
+      "accuracy_percent": 80.0,
+      "samples": 25
+    },
+    "Eleutheronema Tetradactylum - Fresh": {
+      "accuracy": 0.25,
+      "accuracy_percent": 25.0,
+      "samples": 12
+    },
+    "Eleutheronema Tetradactylum - Highly Fresh": {
+      "accuracy": 0.5,
+      "accuracy_percent": 50.0,
+      "samples": 12
+    },
+    "Eleutheronema Tetradactylum - Not Fresh": {
+      "accuracy": 1.0,
+      "accuracy_percent": 100.0,
+      "samples": 12
+    },
+    "Johnius Trachycephalus - Fresh": {
+      "accuracy": 0.416667,
+      "accuracy_percent": 41.67,
+      "samples": 12
+    },
+    "Johnius Trachycephalus - Highly Fresh": {
+      "accuracy": 0.75,
+      "accuracy_percent": 75.0,
+      "samples": 12
+    },
+    "Johnius Trachycephalus - Not Fresh": {
+      "accuracy": 0.916667,
+      "accuracy_percent": 91.67,
+      "samples": 12
+    },
+    "Nibea Albiflora - Fresh": {
+      "accuracy": 0.526316,
+      "accuracy_percent": 52.63,
+      "samples": 19
+    },
+    "Nibea Albiflora - Highly Fresh": {
+      "accuracy": 0.692308,
+      "accuracy_percent": 69.23,
+      "samples": 26
+    },
+    "Nibea Albiflora - Not Fresh": {
+      "accuracy": 0.611111,
+      "accuracy_percent": 61.11,
+      "samples": 18
+    },
+    "Oreochromis Mossambicus - Fresh": {
+      "accuracy": 0.730769,
+      "accuracy_percent": 73.08,
+      "samples": 26
+    },
+    "Oreochromis Mossambicus - Highly Fresh": {
+      "accuracy": 0.860465,
+      "accuracy_percent": 86.05,
+      "samples": 43
+    },
+    "Oreochromis Mossambicus - Not Fresh": {
+      "accuracy": 0.583333,
+      "accuracy_percent": 58.33,
+      "samples": 24
+    },
+    "Oreochromis Niloticus - Fresh": {
+      "accuracy": 0.647059,
+      "accuracy_percent": 64.71,
+      "samples": 34
+    },
+    "Oreochromis Niloticus - Highly Fresh": {
+      "accuracy": 0.755102,
+      "accuracy_percent": 75.51,
+      "samples": 49
+    },
+    "Oreochromis Niloticus - Not Fresh": {
+      "accuracy": 0.513514,
+      "accuracy_percent": 51.35,
+      "samples": 37
+    },
+    "Rastrelliger Faughni - Fresh": {
+      "accuracy": 0.625,
+      "accuracy_percent": 62.5,
+      "samples": 32
+    },
+    "Rastrelliger Faughni - Highly Fresh": {
+      "accuracy": 0.84,
+      "accuracy_percent": 84.0,
+      "samples": 50
+    },
+    "Rastrelliger Faughni - Not Fresh": {
+      "accuracy": 0.75,
+      "accuracy_percent": 75.0,
+      "samples": 32
+    },
+    "Upeneus Moluccensis - Fresh": {
+      "accuracy": 0.710526,
+      "accuracy_percent": 71.05,
+      "samples": 38
+    },
+    "Upeneus Moluccensis - Highly Fresh": {
+      "accuracy": 0.847826,
+      "accuracy_percent": 84.78,
+      "samples": 46
+    },
+    "Upeneus Moluccensis - Not Fresh": {
+      "accuracy": 0.5,
+      "accuracy_percent": 50.0,
+      "samples": 34
+    }
+  },
+  "preprocessing": {
+    "color_mode": "rgb",
+    "crop": "none; direct resize",
+    "keep_aspect_ratio": false,
+    "normalization": "tf.keras.applications.mobilenet_v2.preprocess_input (x / 127.5 - 1.0)",
+    "resize_interpolation": "nearest",
+    "target_size": [
+      224,
+      224
+    ]
+  },
+  "split": "test"
+}

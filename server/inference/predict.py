@@ -166,29 +166,20 @@ _yolo_model = None
 
 
 def warmup_models():
-    """Preload Keras model and YOLO model into memory so inference is instant on first request."""
-    global _model, _yolo_model
+    """Preload Keras model into memory so inference is instant on first request."""
+    global _model
     try:
-        print("[WARMUP] Preloading Keras model...")
+        print("[WARMUP] Preloading Keras freshness model...")
         model = _load_model()
         dummy_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
         try:
             _ = model(dummy_input, training=False).numpy()
         except Exception:
             _ = model.predict(dummy_input, verbose=0)
-        print("[WARMUP] Keras model ready.")
+        print("[WARMUP] Keras freshness model ready.")
     except Exception as e:
         print(f"[WARMUP] Keras preload warning: {e}")
 
-    try:
-        print("[WARMUP] Preloading YOLO model...")
-        from ultralytics import YOLO
-        model_path = os.path.join(MODEL_DIR, "fish_eye_yolo.pt")
-        if os.path.exists(model_path):
-            _yolo_model = YOLO(model_path)
-            print("[WARMUP] YOLO model ready.")
-    except Exception as e:
-        print(f"[WARMUP] YOLO preload warning: {e}")
 
 
 
@@ -285,41 +276,11 @@ def _get_roboflow_box(image_path: str):
     return None
 
 def _validate_eye_crop(img: np.ndarray) -> bool:
-    """Runs YOLOv8 on a candidate crop to check if it contains a fish eye."""
-    global _yolo_model
-    try:
-        from ultralytics import YOLO
-        if _yolo_model is None:
-            model_path = os.path.join(MODEL_DIR, "fish_eye_yolo.pt")
-            if os.path.exists(model_path):
-                _yolo_model = YOLO(model_path)
-            else:
-                return True  # Fallback to true if model is not found
-        
-        # Save temporary crop for YOLO validation
-        temp_path = "temp_validation_crop.jpg"
-        cv2.imwrite(temp_path, img)
-        
-        # Run YOLO with low threshold to catch cloudy eyes, but reject fins/scales
-        results = _yolo_model(temp_path, conf=0.04, verbose=False)
-        
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-            
-        if not results:
-            return False
-        
-        boxes = results[0].boxes
-        if len(boxes) > 0:
-            best_conf = max([float(b.conf[0]) for b in boxes])
-            print(f"[VALIDATION] Found eye in crop with confidence: {best_conf:.3f}")
-            return True
-            
-        print("[VALIDATION] No eye detected in crop (likely a fin, scale, or background)")
+    """Validates that a candidate crop contains valid pixel data."""
+    if img is None or img.size == 0:
         return False
-    except Exception as e:
-        print(f"[VALIDATION] Error during validation: {e}")
-        return True  # Fallback to true on error
+    return True
+
 
 
 def predict(image_path: str, lat: float = None, lng: float = None, manual_box: list = None) -> dict:

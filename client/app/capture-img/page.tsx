@@ -258,7 +258,12 @@ export default function CapturePage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout for cold start
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://freshway-api.onrender.com";
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        (typeof window !== "undefined" && window.location.hostname === "localhost"
+          ? "http://localhost:5000"
+          : "https://freshway-api.onrender.com");
+
       const response = await fetch(`${apiUrl}/predict`, {
         method: "POST",
         body: formData,

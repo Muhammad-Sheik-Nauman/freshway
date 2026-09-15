@@ -26,6 +26,7 @@ from inference.preprocess import preprocess_for_inference, LABEL_MAP
 from business_logic.routing import get_ice_recommendation, get_recommended_buyers, get_buyer_suggestion
 
 
+
 def _enhance_image(img: np.ndarray) -> np.ndarray:
     """Sharpen and enhance a potentially blurry image before analysis."""
     # Unsharp mask for sharpening
@@ -297,10 +298,9 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
         if img_raw is None: raise Exception("Failed to read image")
         H, W = img_raw.shape[:2]
 
-        # Validate manual crop if provided by the user (reject fins, scales, etc.)
-        # NOTE: We use generous padding (100%) because YOLO was trained on full
-        # images, not tight eye crops.  If YOLO still can't confirm, we trust
-        # the user's explicit tap rather than blocking them.
+        # GUARD: Validate that the image contains a fish eye using YOLO.
+        # This replaces the unreliable Haar cascade face detection.
+        # If YOLO can't find a fish eye anywhere in the image, reject it.
         if manual_box:
             x, y, w, h = manual_box
             pad_x = int(w * 1.0)
@@ -316,8 +316,13 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
                 # Last resort: try validating on the full image instead of the crop
                 is_valid = _validate_eye_crop(img_raw)
             if not is_valid:
-                print("[PREDICT] YOLO could not confirm eye in manual crop — trusting user tap anyway")
-                # We trust the user's manual selection rather than blocking
+                print("[PREDICT] YOLO could not confirm a fish eye — rejecting image")
+                return {
+                    "freshness": "Invalid Image",
+                    "confidence": 0,
+                    "status": "error",
+                    "message": "No fish eye detected. Please upload a clear, close-up photo of the fish eye.",
+                }
 
         # STEP 0: Enhance image to handle blur before detection
         img_enhanced = _enhance_image(img_raw)
@@ -421,9 +426,22 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
                 veto_key = [k for k in triggered_rules.keys() if k.startswith("VETO_")][0]
                 override_reason = f"Hard Veto Triggered: {veto_key} ({triggered_rules[veto_key]})"
             elif cnn_confidence >= 0.60:
-                # Trust the CNN completely if it is highly confident
-                crop_probs = ai_reordered
-                override_reason = "None (Trusted high confidence CNN)"
+                # Check for expert disagreement before blindly trusting CNN
+                cnn_class = int(np.argmax(ai_reordered))  # 0=HF, 1=F, 2=NF
+                expert_leans_not_fresh = expert_arr[2] > expert_arr[0]  # expert not_fresh > highly_fresh
+
+                if cnn_class in (0, 1) and expert_leans_not_fresh:
+                    # CNN says fresh but expert rules see physical degradation → force blend
+                    crop_probs = (ai_reordered * 0.50) + (expert_arr * 0.50)
+                    override_occurred = True
+                    override_reason = (
+                        f"Expert Disagreement (CNN={['HF','F','NF'][cnn_class]} "
+                        f"conf={cnn_confidence:.2f}, expert_NF={expert_arr[2]:.2f} > expert_HF={expert_arr[0]:.2f})"
+                    )
+                else:
+                    # CNN and expert agree on direction — trust CNN
+                    crop_probs = ai_reordered
+                    override_reason = "None (Trusted high confidence CNN, expert agrees)"
             else:
                 # Uncertainty fusion: 80% CNN, 20% Expert Rules
                 crop_probs = (ai_reordered * 0.80) + (expert_arr * 0.20)

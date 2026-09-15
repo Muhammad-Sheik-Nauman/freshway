@@ -3,8 +3,10 @@
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
@@ -12,16 +14,51 @@ export default function LoginPage() {
     password: "",
     location: "",
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    alert("Signup successful with credentials!");
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        location: formData.location,
+        isSignUp: isSignUp ? "true" : "false",
+      });
+
+      if (res?.error) {
+        setError(res.error === "CredentialsSignin" ? "Invalid email or password" : res.error);
+        setLoading(false);
+      } else if (res?.ok) {
+        // Refresh session and check role
+        const roleRes = await fetch("/api/user/role");
+        if (roleRes.ok) {
+          const data = await roleRes.json();
+          if (data.role === "buyer") {
+            router.push("/buyer/dashboard");
+            return;
+          } else if (data.role === "seller") {
+            router.push("/dashboard");
+            return;
+          }
+        }
+        router.push("/select-role");
+      }
+    } catch (err: any) {
+      setError("An unexpected error occurred. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,6 +87,12 @@ export default function LoginPage() {
             {isSignUp ? "Join FreshWay as a buyer or seller" : "Sign in to continue"}
           </p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-semibold text-center">
+            {error}
+          </div>
+        )}
 
         {/* Google Btn — redirects to select-role for new users */}
         <button
@@ -116,9 +159,20 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-[#1a2a3a] to-[#3a7bd5] text-white font-bold rounded-lg shadow-md hover:shadow-lg hover:-translate-y-px transition-all mt-2"
+            disabled={loading}
+            className="w-full py-3 bg-gradient-to-r from-[#1a2a3a] to-[#3a7bd5] text-white font-bold rounded-lg shadow-md hover:shadow-lg hover:-translate-y-px transition-all mt-2 flex items-center justify-center"
           >
-            {isSignUp ? "Sign Up" : "Log In"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              isSignUp ? "Sign Up" : "Log In"
+            )}
           </button>
         </form>
 
@@ -127,7 +181,10 @@ export default function LoginPage() {
             {isSignUp ? "Already have an account?" : "Don't have an account?"}
           </span>
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => {
+              setError("");
+              setIsSignUp(!isSignUp);
+            }}
             className="ml-1.5 font-bold text-[#3a7bd5] hover:underline"
           >
             {isSignUp ? "Log In" : "Sign up"}

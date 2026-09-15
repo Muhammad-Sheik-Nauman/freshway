@@ -35,10 +35,10 @@ def analyze_expert_rules(image_path_or_arr, return_debug=False):
     # ─── HARD VETO CONDITIONS (override everything) ───────────────────────
     # These are physically certain indicators — no weighting needed.
 
-    # VETO 1: Milky/Cloudy eye (extremely low saturation, i.e., grayscale)
-    # Refactored: Threshold lowered to <12.0 based on actual dataset statistics
-    if avg_sat < 12.0:
-        triggered_rules["VETO_1_milky_eye"] = f"avg_sat={avg_sat:.1f} < 12.0"
+    # VETO 1: Milky/Cloudy eye (low saturation, i.e., grayscale/washed out)
+    # Raised threshold to <18.0 to catch cloudy eyes with slight ambient color
+    if avg_sat < 18.0:
+        triggered_rules["VETO_1_milky_eye"] = f"avg_sat={avg_sat:.1f} < 18.0"
         veto_scores = [0.0, 0.05, 0.95]
         return (veto_scores, triggered_rules) if return_debug else veto_scores
 
@@ -58,7 +58,43 @@ def analyze_expert_rules(image_path_or_arr, return_debug=False):
         veto_scores = [0.0, 0.0, 1.0]
         return (veto_scores, triggered_rules) if return_debug else veto_scores
 
-    # ─── WEIGHTED SCORING SYSTEM ─────────────────────────────────────────
+    # VETO 3: Combined high-brightness + low-darkness = definitively cloudy/milky cornea
+    # A fresh eye has dark pupil visible through transparent cornea.
+    # A milky eye is bright/washed out with no dark center.
+    h_v, w_v = gray.shape
+    veto_center_mask = np.zeros((h_v, w_v), np.uint8)
+    cv2.circle(veto_center_mask, (w_v // 2, h_v // 2), int(min(w_v, h_v) * 0.25), 255, -1)
+    veto_dark_px = float(np.sum(gray[veto_center_mask > 0] < 70))
+    veto_total_px = float(np.sum(veto_center_mask > 0)) + 1e-6
+    veto_dark_ratio = veto_dark_px / veto_total_px
+    if veto_dark_ratio < 0.08 and avg_val > 160:
+        triggered_rules["VETO_3_cloudy_bright"] = f"dark_ratio={veto_dark_ratio:.3f} < 0.08 AND avg_val={avg_val:.1f} > 160"
+        veto_scores = [0.0, 0.05, 0.95]
+        return (veto_scores, triggered_rules) if return_debug else veto_scores
+
+    # VETO 4: Dull/Hazy eye (no reflections + murky pupil + dull color)
+    # A genuinely fresh eye ALWAYS has: moisture → specular reflections,
+    # clear cornea → sharp pupil boundary, and vivid coloring.
+    # If ALL THREE are absent simultaneously, the eye is definitively not fresh.
+    _, veto_thresh = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
+    veto_white_pixels = cv2.countNonZero(veto_thresh)
+    # Compute pupil edge clarity in center region
+    v_ch, v_cw = h_v // 2, w_v // 2
+    v_r_inner = int(min(h_v, w_v) * 0.22)
+    v_pupil_mask = np.zeros((h_v, w_v), np.uint8)
+    cv2.circle(v_pupil_mask, (v_cw, v_ch), v_r_inner, 255, -1)
+    v_center_roi = cv2.bitwise_and(gray, gray, mask=v_pupil_mask)
+    v_pupil_edge_var = cv2.Laplacian(v_center_roi, cv2.CV_64F).var()
+
+    if veto_white_pixels < 80 and v_pupil_edge_var < 30.0 and avg_sat < 35.0:
+        triggered_rules["VETO_4_dull_hazy"] = (
+            f"white_px={veto_white_pixels} < 80, "
+            f"pupil_var={v_pupil_edge_var:.1f} < 30, "
+            f"sat={avg_sat:.1f} < 35"
+        )
+        veto_scores = [0.0, 0.10, 0.90]
+        return (veto_scores, triggered_rules) if return_debug else veto_scores
+
     # [Highly Fresh, Fresh, Not Fresh]
     scores = np.array([0.0, 0.0, 0.0])
 
@@ -79,17 +115,32 @@ def analyze_expert_rules(image_path_or_arr, return_debug=False):
 
     # ─── 2. REFLECTIVITY / MOISTURE ──────────────────────────────────────
     # Refactored: Highly fresh median is ~294 pixels, mean is ~2434 pixels
+    # GUARD: If the overall image is very bright (avg_val > 170), high white_pixels
+    # is likely cloudiness, NOT fresh moisture. Flip the interpretation.
     _, thresh = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
     white_pixels = cv2.countNonZero(thresh)
-    if white_pixels > 2500:
-        scores += [0.35, 0.1, 0.0]
-        triggered_rules["Rule_2_Reflectivity"] = f"Highly Fresh (white_pixels={white_pixels} > 2500)"
-    elif 100 < white_pixels <= 2500:
-        scores += [0.25, 0.2, 0.0]
-        triggered_rules["Rule_2_Reflectivity"] = f"Fresh (100 < white_pixels={white_pixels} <= 2500)"
+    is_cloudy_bright = avg_val > 170
+    if is_cloudy_bright:
+        # Bright/washed-out image: high white pixels = cloudy, not moist
+        if white_pixels > 2500:
+            scores += [0.0, 0.0, 0.4]
+            triggered_rules["Rule_2_Reflectivity"] = f"Cloudy Bright (white_pixels={white_pixels} > 2500, avg_val={avg_val:.1f} > 170)"
+        elif 100 < white_pixels <= 2500:
+            scores += [0.0, 0.15, 0.2]
+            triggered_rules["Rule_2_Reflectivity"] = f"Slightly Cloudy (100 < white_pixels={white_pixels} <= 2500, avg_val={avg_val:.1f} > 170)"
+        else:
+            scores += [0.1, 0.2, 0.1]
+            triggered_rules["Rule_2_Reflectivity"] = f"Dark despite bright image (white_pixels={white_pixels} <= 100)"
     else:
-        scores += [0.0, 0.05, 0.35]
-        triggered_rules["Rule_2_Reflectivity"] = f"Dull / Not Fresh (white_pixels={white_pixels} <= 100)"
+        if white_pixels > 2500:
+            scores += [0.35, 0.1, 0.0]
+            triggered_rules["Rule_2_Reflectivity"] = f"Highly Fresh (white_pixels={white_pixels} > 2500)"
+        elif 100 < white_pixels <= 2500:
+            scores += [0.25, 0.2, 0.0]
+            triggered_rules["Rule_2_Reflectivity"] = f"Fresh (100 < white_pixels={white_pixels} <= 2500)"
+        else:
+            scores += [0.0, 0.05, 0.35]
+            triggered_rules["Rule_2_Reflectivity"] = f"Dull / Not Fresh (white_pixels={white_pixels} <= 100)"
 
     # ─── 3. SHARPNESS / OPACITY ──────────────────────────────────────────
     # Note: low sharpness can be from photo quality, not fish age.
@@ -170,8 +221,22 @@ def analyze_expert_rules(image_path_or_arr, return_debug=False):
         scores += [0.1, 0.25, 0.05]
         triggered_rules["Rule_7_CorneaOpacity"] = f"Semi-Transparent (0.10 < dark_ratio={dark_ratio:.3f} <= 0.30)"
     else:
-        scores += [0.0, 0.05, 0.35]
+        # Boosted penalty: an opaque/milky cornea is a very strong not-fresh indicator
+        scores += [0.0, 0.0, 0.55]
         triggered_rules["Rule_7_CorneaOpacity"] = f"Opaque/Milky (dark_ratio={dark_ratio:.3f} <= 0.10)"
+
+    # ─── LATE COMPOUND OVERRIDE ────────────────────────────────────────────
+    # If the eye is both SUNKEN and DULL (no moisture reflections), it is
+    # definitively degraded. In this case, high "darkness" (Rule 7) and
+    # high "texture" (Rule 6) are actually from DECAY, not freshness.
+    # Override the scores directly — this is a physical certainty.
+    is_sunken = "Sunken" in triggered_rules.get("Rule_5_Convexity", "")
+    is_dull = "Dull" in triggered_rules.get("Rule_2_Reflectivity", "")
+
+    if is_sunken and is_dull:
+        triggered_rules["VETO_5_compound_decay"] = "Sunken + Dull = Definitive Decay"
+        scores = np.array([0.0, 0.10, 0.90])
+        return (scores.tolist(), triggered_rules) if return_debug else scores.tolist()
 
     # ─── NORMALIZE ───────────────────────────────────────────────────────
     total = np.sum(scores)

@@ -1,12 +1,17 @@
+import os
+# Force TensorFlow into lightweight CPU mode — saves 150MB RAM and eliminates CUDA scanning delay
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
 from dotenv import load_dotenv
 
 # Load environment variables first
 load_dotenv()
 
 from inference.predict import predict, warmup_models
+
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes

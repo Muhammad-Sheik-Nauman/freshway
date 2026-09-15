@@ -6,8 +6,12 @@ Two-stage inference pipeline with Multi-Crop Averaging (ITA).
 """
 
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 import numpy as np
 import tensorflow as tf
+
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenet_preprocess
 from tensorflow.keras.applications.efficientnet import preprocess_input as efficientnet_preprocess
 
@@ -356,19 +360,20 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
         enhanced_path = image_path + "_enhanced.jpg"
         cv2.imwrite(enhanced_path, img_enhanced)
 
-        # STEP 1: Try manual box, then Local YOLO, then Roboflow, then fallback
+        # STEP 1: Try manual box, then Roboflow Cloud API, then OpenCV, then center crop
         box = manual_box
         if not box:
-            box = _get_local_yolo_box(image_path)
-        if not box:
-            print("[PREDICT] Local YOLO missed on original, trying enhanced version...")
-            box = _get_local_yolo_box(enhanced_path)
-        if not box:
-            print("[PREDICT] Local YOLO missed, trying Roboflow API on original...")
+            print("[PREDICT] Trying Roboflow Cloud API on original...")
             box = _get_roboflow_box(image_path)
         if not box:
             print("[PREDICT] Roboflow missed on original, trying Roboflow API on enhanced version...")
             box = _get_roboflow_box(enhanced_path)
+        if not box:
+            print("[PREDICT] Roboflow missed, trying OpenCV dark circular eye detection...")
+            box = _detect_eye_fallback(img_raw)
+        if not box:
+            print("[PREDICT] Trying local YOLO...")
+            box = _get_local_yolo_box(image_path)
         
         # Option A Fallback: If AI detection misses, assume the eye is aligned in the center
         if not box:
@@ -378,6 +383,7 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
             crop_x = (W - crop_w) // 2
             crop_y = (H - crop_h) // 2
             box = [crop_x, crop_y, crop_w, crop_h]
+
 
         # Clean up enhanced temp file
         if os.path.exists(enhanced_path):

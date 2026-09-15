@@ -4,10 +4,15 @@ server/data/val/
 server/scratch/fish_eye_dataset/
 server/scratch/yolo_runs/
 
-# ─── Trained Models (too large for git) ──────────────────
-server/models/*.keras
-server/models/*.pt
+# ─── Trained Models ──────────────────────────────────────
+# Keep checkpoint and training artifacts out of git
+server/models/ensemble_checkpoint.keras
+server/models/freshness_ensemble_final.keras
 server/yolov8n.pt
+
+# Allow these essential models (needed for deployment):
+# server/models/freshness_ensemble_best.keras  (58 MB - main model)
+# server/models/fish_eye_yolo.pt               (6 MB - eye detector)
 
 # ─── Training Logs ───────────────────────────────────────
 server/logs/

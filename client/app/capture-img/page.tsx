@@ -256,14 +256,19 @@ export default function CapturePage() {
       }
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout for cold start
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/predict`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://freshway-api.onrender.com";
+      const response = await fetch(`${apiUrl}/predict`, {
         method: "POST",
         body: formData,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
 
       const data: PredictionResult = await response.json();
       setResult(data);
@@ -271,16 +276,13 @@ export default function CapturePage() {
     } catch (error: unknown) {
       console.error("Analysis failed:", error);
       const isTimeout = error instanceof Error && error.name === "AbortError";
-      const isNetwork = error instanceof TypeError && error.message.includes("fetch");
       setResult({
         freshness: "Error",
         confidence: 0,
         status: "error",
         message: isTimeout
-          ? "Analysis timed out. The image may be too large or the server is busy. Please try again."
-          : isNetwork
-          ? "Cannot reach the server. Please make sure app.py is running on port 5000 and try again."
-          : "Analysis failed unexpectedly. Please try again.",
+          ? "Analysis timed out. The backend is waking up or the image is too large. Please try again in a few seconds."
+          : "Cannot reach the AI server. Please make sure the backend is awake and try again.",
       });
       setShowResult(true);
     } finally {

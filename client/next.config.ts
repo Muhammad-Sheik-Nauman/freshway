@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://freshway-api.onrender.com";
 
 const nextConfig: NextConfig = {
   async rewrites() {

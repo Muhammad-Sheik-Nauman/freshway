@@ -62,6 +62,12 @@ def predict_endpoint():
             os.remove(image_path)
 
 
+@app.route("/", methods=["GET"])
+def index():
+    """Root endpoint."""
+    return jsonify({"status": "ok", "message": "FreshWay Backend API is running! 🐟"})
+
+
 @app.route("/health", methods=["GET"])
 def health_check():
     """Health check endpoint."""
@@ -70,3 +76,4 @@ def health_check():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+

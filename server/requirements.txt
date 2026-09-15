@@ -1,8 +1,12 @@
 flask
 flask-cors
+gunicorn
 tensorflow
 numpy
 pillow
 pymongo
 geopy
 ultralytics
+opencv-python-headless
+python-dotenv
+requests

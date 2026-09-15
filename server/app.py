@@ -6,10 +6,17 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-from inference.predict import predict
+from inference.predict import predict, warmup_models
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Warmup models on boot so first request does not time out
+try:
+    warmup_models()
+except Exception as e:
+    print(f"[BOOT] Warmup warning: {e}")
+
 
 
 @app.route("/predict", methods=["POST"])

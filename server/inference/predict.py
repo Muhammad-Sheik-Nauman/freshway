@@ -158,8 +158,35 @@ def _load_model():
 
     raise FileNotFoundError(f"No trained model found!")
 
-
 _yolo_model = None
+
+
+def warmup_models():
+    """Preload Keras model and YOLO model into memory so inference is instant on first request."""
+    global _model, _yolo_model
+    try:
+        print("[WARMUP] Preloading Keras model...")
+        model = _load_model()
+        dummy_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+        try:
+            _ = model(dummy_input, training=False).numpy()
+        except Exception:
+            _ = model.predict(dummy_input, verbose=0)
+        print("[WARMUP] Keras model ready.")
+    except Exception as e:
+        print(f"[WARMUP] Keras preload warning: {e}")
+
+    try:
+        print("[WARMUP] Preloading YOLO model...")
+        from ultralytics import YOLO
+        model_path = os.path.join(MODEL_DIR, "fish_eye_yolo.pt")
+        if os.path.exists(model_path):
+            _yolo_model = YOLO(model_path)
+            print("[WARMUP] YOLO model ready.")
+    except Exception as e:
+        print(f"[WARMUP] YOLO preload warning: {e}")
+
+
 
 def _get_local_yolo_box(image_path: str):
     """Detects fish eye using the locally trained YOLOv8 model."""
@@ -400,7 +427,10 @@ def predict(image_path: str, lat: float = None, lng: float = None, manual_box: l
                 # Legacy MobileNetV2 model needs external preprocessing
                 processed_img = preprocess_for_inference(crop)
 
-            ai_preds = model.predict(processed_img, verbose=0)[0]
+            try:
+                ai_preds = model(processed_img, training=False).numpy()[0]
+            except Exception:
+                ai_preds = model.predict(processed_img, verbose=0)[0]
             
             # Map AI outputs to [highly_fresh, fresh, not_fresh]
             # Model CLASS_NAMES = ["fresh", "highly_fresh", "not_fresh"]
